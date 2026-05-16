@@ -143,6 +143,25 @@ class F5TtsProvider:
     def _ensure_loaded(self, model_id: str) -> None:
         if self._model is not None:
             return
+        # Patch F5's audio loader before the first inference call. F5's
+        # `infer_batch_process` does `torchaudio.load(ref_file)`, and torchaudio>=2.9
+        # dispatches via torchcodec which needs libavutil from ffmpeg at runtime;
+        # Octopus worker pods do not ship ffmpeg. soundfile has no native deps
+        # beyond libsndfile and matches torchaudio.load's (Tensor, int) return
+        # contract (channels, frames).
+        import f5_tts.infer.utils_infer as _f5_ui
+        import numpy as np
+        import soundfile as sf
+        import torch
+
+        def _sf_load(uri, *args, **kwargs):
+            del args, kwargs
+            data, sr = sf.read(str(uri), dtype="float32", always_2d=True)
+            tensor = torch.from_numpy(np.ascontiguousarray(data.T))
+            return tensor, int(sr)
+
+        _f5_ui.torchaudio.load = _sf_load
+
         from f5_tts.api import F5TTS
         self._model = F5TTS(model=model_id, device=self._device)
 
