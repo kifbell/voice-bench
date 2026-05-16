@@ -154,6 +154,26 @@ class XttsV2Provider:
         from TTS.tts.models.xtts import Xtts
         from TTS.utils.manage import ModelManager
 
+        # Patch XTTS's module-level load_audio to use soundfile instead of torchaudio.
+        # torchaudio>=2.9 dispatches via torchcodec, which needs libavutil from ffmpeg
+        # at runtime; Octopus worker images do not ship ffmpeg. soundfile has no
+        # native deps beyond libsndfile (always present), and torchaudio.functional
+        # .resample is pure PyTorch so it does not touch the codec layer either.
+        import TTS.tts.models.xtts as _xtts_module
+        import soundfile as sf
+        import torch
+        import torchaudio.functional as F
+
+        def _sf_load_audio(audiopath, sampling_rate):
+            wav, sr = sf.read(str(audiopath), dtype="float32", always_2d=True)
+            audio = torch.from_numpy(wav.mean(axis=1))[None, :]
+            if sr != sampling_rate:
+                audio = F.resample(audio, sr, sampling_rate)
+            audio.clamp_(-1.0, 1.0)
+            return audio
+
+        _xtts_module.load_audio = _sf_load_audio
+
         manager = ModelManager()
         model_dir, _, _ = manager.download_model("tts_models/multilingual/multi-dataset/xtts_v2")
         config = XttsConfig()
