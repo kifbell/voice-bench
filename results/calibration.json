@@ -1,0 +1,31 @@
+{
+  "manifest": "/Users/kifbell/voice-bench/results/data/samples.json",
+  "seed": 42,
+  "same_pairs_per_speaker": 5,
+  "cross_pairs": 50,
+  "n_speakers": 20,
+  "wavlm": {
+    "same_mean": 0.9378102397918702,
+    "same_p05": 0.8475655287504196,
+    "same_p50": 0.9449552297592163,
+    "same_p95": 0.9804878741502762,
+    "cross_mean": 0.7297388750314713,
+    "cross_p05": 0.44175463169813156,
+    "cross_p50": 0.7861927449703217,
+    "cross_p95": 0.9147686898708343,
+    "n_same": 100,
+    "n_cross": 50
+  },
+  "ecapa": {
+    "same_mean": 0.6378284083306789,
+    "same_p05": 0.43928782492876056,
+    "same_p50": 0.6648710072040558,
+    "same_p95": 0.8141362011432647,
+    "cross_mean": 0.20819910913705825,
+    "cross_p05": 0.060647640563547614,
+    "cross_p50": 0.19679753482341766,
+    "cross_p95": 0.4305251166224479,
+    "n_same": 100,
+    "n_cross": 50
+  }
+}

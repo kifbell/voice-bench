@@ -1,0 +1,26 @@
+# Generation
+elevenlabs>=2.39,<3
+openai>=2.0,<3
+python-dotenv>=1.0
+tenacity>=9.0
+# replicate>=0.34         # uncomment when REPLICATE_API_TOKEN is configured
+
+# Metrics: judge models. numpy<2 due to speechbrain 1.0 ABI.
+numpy>=1.26,<2
+torch>=2.3,<3
+torchaudio>=2.3,<3
+transformers>=4.40,<5
+speechbrain>=1.0,<2
+faster-whisper>=1.0
+soundfile>=0.12
+librosa>=0.10
+jiwer>=3
+
+# Analysis & viz
+pandas>=2
+scipy>=1.13
+matplotlib>=3.8
+seaborn>=0.13
+pyarrow>=15
+scikit-learn>=1.4
+tqdm>=4

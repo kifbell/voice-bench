@@ -1,0 +1,253 @@
+{
+  "n_rows": 10,
+  "providers": [
+    "elevenlabs"
+  ],
+  "tasks": [
+    "cloning",
+    "tts"
+  ],
+  "skipped": [
+    "pairwise_wilcoxon: needs \u22652 providers"
+  ],
+  "calibration": {
+    "manifest": "/Users/kifbell/voice-bench/results/data/samples.json",
+    "seed": 42,
+    "same_pairs_per_speaker": 5,
+    "cross_pairs": 50,
+    "n_speakers": 20,
+    "wavlm": {
+      "same_mean": 0.9378102397918702,
+      "same_p05": 0.8475655287504196,
+      "same_p50": 0.9449552297592163,
+      "same_p95": 0.9804878741502762,
+      "cross_mean": 0.7297388750314713,
+      "cross_p05": 0.44175463169813156,
+      "cross_p50": 0.7861927449703217,
+      "cross_p95": 0.9147686898708343,
+      "n_same": 100,
+      "n_cross": 50
+    },
+    "ecapa": {
+      "same_mean": 0.6378284083306789,
+      "same_p05": 0.43928782492876056,
+      "same_p50": 0.6648710072040558,
+      "same_p95": 0.8141362011432647,
+      "cross_mean": 0.20819910913705825,
+      "cross_p05": 0.060647640563547614,
+      "cross_p50": 0.19679753482341766,
+      "cross_p95": 0.4305251166224479,
+      "n_same": 100,
+      "n_cross": 50
+    }
+  },
+  "per_provider": {
+    "elevenlabs|cloning": {
+      "utmos": {
+        "mean": 3.3635435581207274,
+        "ci_low": 2.9598581314086916,
+        "ci_high": 3.8402846336364744,
+        "n": 5
+      },
+      "whisper_wer": {
+        "mean": 0.03536231884057971,
+        "ci_low": 0.0,
+        "ci_high": 0.08869565217391304,
+        "n": 5
+      },
+      "wavlm_sim": {
+        "mean": 0.956682825088501,
+        "ci_low": 0.9470373392105103,
+        "ci_high": 0.9693889141082763,
+        "n": 5
+      },
+      "ecapa_sim": {
+        "mean": 0.718480920791626,
+        "ci_low": 0.6822965502738952,
+        "ci_high": 0.7462728142738342,
+        "n": 5
+      }
+    },
+    "elevenlabs|tts": {
+      "utmos": {
+        "mean": 3.571253442764282,
+        "ci_low": 3.2756780624389648,
+        "ci_high": 3.7736313343048096,
+        "n": 5
+      },
+      "whisper_wer": {
+        "mean": 0.043333333333333335,
+        "ci_low": 0.0,
+        "ci_high": 0.09666666666666665,
+        "n": 5
+      },
+      "wavlm_sim": {
+        "mean": NaN,
+        "ci_low": NaN,
+        "ci_high": NaN,
+        "n": 0
+      },
+      "ecapa_sim": {
+        "mean": NaN,
+        "ci_low": NaN,
+        "ci_high": NaN,
+        "n": 0
+      }
+    }
+  },
+  "metric_correlations": {
+    "cloning": {
+      "utmos__whisper_wer": {
+        "rho": -0.6708203932499368,
+        "p": 0.21516994256955022,
+        "n": 5
+      },
+      "utmos__wavlm_sim": {
+        "rho": 0.19999999999999998,
+        "p": 0.7470600781046621,
+        "n": 5
+      },
+      "utmos__ecapa_sim": {
+        "rho": 0.8999999999999998,
+        "p": 0.03738607346849874,
+        "n": 5
+      },
+      "whisper_wer__wavlm_sim": {
+        "rho": -0.4472135954999579,
+        "p": 0.4501848557521007,
+        "n": 5
+      },
+      "whisper_wer__ecapa_sim": {
+        "rho": -0.4472135954999579,
+        "p": 0.4501848557521007,
+        "n": 5
+      },
+      "wavlm_sim__ecapa_sim": {
+        "rho": 0.09999999999999999,
+        "p": 0.8728885715695384,
+        "n": 5
+      }
+    },
+    "tts": {
+      "utmos__whisper_wer": {
+        "rho": -0.22360679774997894,
+        "p": 0.7176856442107861,
+        "n": 5
+      },
+      "utmos__wavlm_sim": {
+        "rho": NaN,
+        "p": NaN,
+        "n": 0
+      },
+      "utmos__ecapa_sim": {
+        "rho": NaN,
+        "p": NaN,
+        "n": 0
+      },
+      "whisper_wer__wavlm_sim": {
+        "rho": NaN,
+        "p": NaN,
+        "n": 0
+      },
+      "whisper_wer__ecapa_sim": {
+        "rho": NaN,
+        "p": NaN,
+        "n": 0
+      },
+      "wavlm_sim__ecapa_sim": {
+        "rho": NaN,
+        "p": NaN,
+        "n": 0
+      }
+    }
+  },
+  "pairwise_wilcoxon": [],
+  "pareto": {
+    "utmos_vs_wavlm": {
+      "cloning": {
+        "frontier": [
+          "elevenlabs"
+        ],
+        "note": "degenerate (\u22641 provider)"
+      },
+      "tts": {
+        "frontier": [],
+        "note": "degenerate (\u22641 provider)"
+      }
+    },
+    "utmos_vs_ecapa": {
+      "cloning": {
+        "frontier": [
+          "elevenlabs"
+        ],
+        "note": "degenerate (\u22641 provider)"
+      },
+      "tts": {
+        "frontier": [],
+        "note": "degenerate (\u22641 provider)"
+      }
+    }
+  },
+  "commercial_vs_oss": [
+    {
+      "metric": "utmos",
+      "by_task": {
+        "cloning": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        },
+        "tts": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        }
+      }
+    },
+    {
+      "metric": "wavlm_sim",
+      "by_task": {
+        "cloning": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        },
+        "tts": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        }
+      }
+    },
+    {
+      "metric": "ecapa_sim",
+      "by_task": {
+        "cloning": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        },
+        "tts": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        }
+      }
+    },
+    {
+      "metric": "whisper_wer",
+      "by_task": {
+        "cloning": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        },
+        "tts": {
+          "n_cc": 0,
+          "n_co": 0,
+          "note": "insufficient providers in either group"
+        }
+      }
+    }
+  ]
+}
