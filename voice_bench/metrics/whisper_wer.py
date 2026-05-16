@@ -1,18 +1,29 @@
 """WER round-trip: synthesised audio → faster-whisper → compare to target text.
 
-Whisper-medium chosen to match TTSDS-style baseline. int8 quantisation keeps CPU
-inference near real-time on Apple Silicon.
+Whisper-medium chosen to match TTSDS-style baseline. On CPU we use int8 to keep
+inference near real-time; on GPU we switch to float16 which is faster and avoids
+the int8 quantization roundtrip overhead.
 """
 import functools
+import os
 from pathlib import Path
 
 import jiwer
 
 
+_DEVICE = os.environ.get("VOICEBENCH_DEVICE", "cpu")
+_COMPUTE_TYPE = os.environ.get(
+    "VOICEBENCH_WHISPER_COMPUTE_TYPE",
+    "float16" if _DEVICE.startswith("cuda") else "int8",
+)
+
+
 @functools.lru_cache(maxsize=1)
 def _model():
     from faster_whisper import WhisperModel
-    return WhisperModel("medium", device="cpu", compute_type="int8")
+    # faster-whisper accepts "cuda" or "cpu" (no index parsing).
+    device = "cuda" if _DEVICE.startswith("cuda") else "cpu"
+    return WhisperModel("medium", device=device, compute_type=_COMPUTE_TYPE)
 
 
 def transcribe(wav_path: Path | str, language: str = "en") -> str:

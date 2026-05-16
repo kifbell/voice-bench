@@ -12,7 +12,7 @@ import torch
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-_DEVICE = os.environ.get("VOICEBENCH_DEVICE", "mps")
+_DEVICE = os.environ.get("VOICEBENCH_DEVICE", "cpu")
 
 
 @functools.lru_cache(maxsize=1)

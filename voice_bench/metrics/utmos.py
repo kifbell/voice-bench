@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 
-_DEVICE = os.environ.get("VOICEBENCH_DEVICE", "mps")
+_DEVICE = os.environ.get("VOICEBENCH_DEVICE", "cpu")
 
 
 @functools.lru_cache(maxsize=1)
