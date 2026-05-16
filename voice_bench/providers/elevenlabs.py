@@ -39,7 +39,9 @@ class ElevenLabsProvider:
         model_id: str = DEFAULT_MODEL,
         *,
         seed: int | None = None,
+        reference_text: str | None = None,
     ) -> GenerationResult:
+        del reference_text  # ElevenLabs IVC does not need the reference transcript.
         ref_key = str(Path(reference_wav_path).resolve())
         voice_id = self._get_or_create_clone_voice(ref_key, reference_wav_path)
         return self._synthesize(

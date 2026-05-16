@@ -39,6 +39,7 @@ class Provider(Protocol):
         model_id: str,
         *,
         seed: int | None = None,
+        reference_text: str | None = None,
     ) -> GenerationResult: ...
 
     def cleanup(self) -> None: ...

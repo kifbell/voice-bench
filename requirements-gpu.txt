@@ -1,0 +1,13 @@
+# Extra deps for running OS TTS models locally on a GPU.
+# Installed separately from requirements.txt because they pull in CUDA-bound torch builds
+# and large model weights; only the worker that runs --provider {xtts_v2,f5_tts} needs them.
+
+# Coqui XTTS-v2: the idiap fork (the original `TTS` PyPI package is unmaintained).
+# License: CPML (non-commercial / research only).
+coqui-tts>=0.24
+
+# F5-TTS (SWivid). License: code MIT, weights CC-BY-NC 4.0.
+f5-tts>=1.0
+
+# Both need a CUDA-enabled torch already present from requirements.txt; the GPU worker
+# image is expected to have one. Do not pin torch here -- defer to the parent file.
