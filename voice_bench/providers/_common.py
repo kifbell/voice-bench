@@ -29,3 +29,14 @@ def read_normalized_txt_alongside(wav_path):
     if candidate.exists():
         return candidate.read_text(encoding="utf-8").strip()
     return None
+
+
+def patch_torchaudio_legacy_apis():
+    """Restore torchaudio APIs removed in 2.9+ that older fish-speech depends on.
+
+    fish-speech 3c7cd3f0 calls torchaudio.list_audio_backends() which was dropped.
+    Stub it to ['soundfile'] so the reference_loader.py backend selection still works.
+    """
+    import torchaudio
+    if not hasattr(torchaudio, "list_audio_backends"):
+        torchaudio.list_audio_backends = lambda: ["soundfile"]

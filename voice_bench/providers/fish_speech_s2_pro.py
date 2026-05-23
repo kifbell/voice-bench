@@ -112,6 +112,8 @@ class FishSpeechS2ProProvider:
             return
         # Make sure the fish-speech repo's tools/ package is importable. fish-speech
         # uses pyrootutils to setup sys.path based on .project-root sentinel.
+        from voice_bench.providers._common import patch_torchaudio_legacy_apis
+        patch_torchaudio_legacy_apis()
         import pyrootutils
         pyrootutils.set_root(
             path=self._fish_repo,

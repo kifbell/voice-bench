@@ -107,6 +107,8 @@ class FishSpeechS1Provider:
     def _ensure_loaded(self):
         if self._engine is not None:
             return
+        from voice_bench.providers._common import patch_torchaudio_legacy_apis
+        patch_torchaudio_legacy_apis()
         import pyrootutils
         pyrootutils.set_root(
             path=self._fish_repo,
