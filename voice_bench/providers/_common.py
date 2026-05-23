@@ -56,7 +56,11 @@ def patch_torchaudio_load_to_soundfile():
 
     def _sf_load(uri, *args, **kwargs):
         del args, kwargs
-        data, sr = sf.read(str(uri), dtype="float32", always_2d=True)
+        # uri can be a path-like (Path/str) or a file-like object (BytesIO).
+        # soundfile.read handles both directly; the buggy old version stringified
+        # the BytesIO instance into '<_io.BytesIO ...>' which then can't open.
+        target = uri if hasattr(uri, "read") else str(uri)
+        data, sr = sf.read(target, dtype="float32", always_2d=True)
         return torch.from_numpy(np.ascontiguousarray(data.T)), int(sr)
 
     torchaudio.load = _sf_load
