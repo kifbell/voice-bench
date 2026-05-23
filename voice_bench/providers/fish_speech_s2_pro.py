@@ -1,30 +1,15 @@
-"""Fish Audio S2 Pro provider via fish-speech v2.0.0-beta api_server.
+"""Fish Audio S2 Pro provider (embedded, no HTTP server).
 
-The launcher on the worker:
-  1. Clones fishaudio/fish-speech @ v2.0.0-beta (a separate branch from main/S1)
-  2. ``pip install -e .[cu129]`` (or cu126/cu128 depending on the pod's torch)
-  3. ``huggingface-cli download fishaudio/s2-pro --local-dir checkpoints/s2-pro``
-  4. Starts ``python tools/api_server.py --listen 127.0.0.1:8080`` as a background
-     subprocess, waits for /v1/health to return 200
-  5. Runs scripts/generate.py with FishSpeechS2ProProvider as a thin HTTP client
-  6. Kills the api_server subprocess on completion
+Loads fish-speech v2 (main branch) TTSInferenceEngine in-process. The launcher
+clones the repo into /tmp/fish-speech-repo-main, calls pyrootutils.setup_root
+to register the tools/ package, and passes ckpt_dir + sys.path setup into
+this provider.
 
-This provider is the HTTP client side. It does not start the server itself --
-the server is process-managed by the launcher.
-
-API (fish-speech v2.0.0-beta, tools/server/views.py):
-  POST /v1/tts
-  body: {
-    "text": "<text>",
-    "format": "wav",
-    "references": [{"audio": "<base64 bytes>", "text": "<ref transcript>"}],
-    "seed": 42,
-    "use_memory_cache": "off"
-  }
-  response: WAV bytes (if streaming=false)
+License: weights under the Fish Audio Research License (non-commercial OK).
 """
-import base64
 import io
+import os
+import sys
 import time
 from pathlib import Path
 
@@ -40,17 +25,32 @@ from voice_bench.providers.base import GenerationResult
 
 
 DEFAULT_MODEL_ID = "s2-pro"
-DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
 
 
 class FishSpeechS2ProProvider:
     name = "fish_speech_s2_pro"
     supports_cloning = True
 
-    def __init__(self, *, server_url: str = DEFAULT_SERVER_URL, request_timeout: float = 600.0):
-        self._server_url = server_url.rstrip("/")
-        self._timeout = request_timeout
-        self._session = None
+    def __init__(
+        self,
+        *,
+        fish_repo_path: str | None = None,
+        ckpt_dir: str | None = None,
+        device: str = "cuda",
+    ):
+        # The launcher exposes FISH_SPEECH_REPO_DIR and FISH_SPEECH_CHECKPOINT_DIR
+        # via env vars; fall back to constructor kwargs for local testing.
+        self._fish_repo = fish_repo_path or os.environ.get("FISH_SPEECH_REPO_DIR")
+        self._ckpt_dir = ckpt_dir or os.environ.get("FISH_SPEECH_CHECKPOINT_DIR")
+        if not self._fish_repo or not self._ckpt_dir:
+            raise RuntimeError(
+                "FishSpeechS2ProProvider requires fish_repo_path and ckpt_dir "
+                "(or FISH_SPEECH_REPO_DIR + FISH_SPEECH_CHECKPOINT_DIR env vars)."
+            )
+        self._device = device
+        self._engine = None
+        self._serve_tts_request_cls = None
+        self._inference_wrapper = None
 
     def tts(self, text, voice_id, model_id=DEFAULT_MODEL_ID, *, seed=None):
         del voice_id
@@ -95,48 +95,92 @@ class FishSpeechS2ProProvider:
         )
 
     def cleanup(self):
-        if self._session is not None:
-            self._session.close()
-            self._session = None
+        if self._engine is not None:
+            del self._engine
+            self._engine = None
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
 
     # -- internals -------------------------------------------------------------
 
-    def _ensure_session(self):
-        if self._session is None:
-            import requests
-            self._session = requests.Session()
+    def _ensure_loaded(self):
+        if self._engine is not None:
+            return
+        # Make sure the fish-speech repo's tools/ package is importable. fish-speech
+        # uses pyrootutils to setup sys.path based on .project-root sentinel.
+        import pyrootutils
+        pyrootutils.set_root(
+            path=self._fish_repo,
+            project_root_env_var=True,
+            dotenv=False,
+            pythonpath=True,
+            cwd=False,
+        )
+        # Imports must come AFTER pyrootutils setup so `tools.server.*` resolves.
+        from tools.server.model_manager import ModelManager
+        manager = ModelManager(
+            mode="tts",
+            device=self._device,
+            half=False,
+            compile=False,
+            llama_checkpoint_path=str(self._ckpt_dir),
+            decoder_checkpoint_path=str(Path(self._ckpt_dir) / "codec.pth"),
+            decoder_config_name="modded_dac_vq",
+        )
+        from tools.server.inference import inference_wrapper
+        from fish_speech.utils.schema import ServeTTSRequest
+
+        self._engine = manager
+        self._inference_wrapper = inference_wrapper
+        self._serve_tts_request_cls = ServeTTSRequest
 
     def _infer(self, *, text, ref_wav, ref_text, seed):
-        self._ensure_session()
-        body: dict = {
-            "text": text,
-            "format": "wav",
-            "references": [],
-            "use_memory_cache": "off",
-            "normalize": True,
-        }
-        if seed is not None:
-            body["seed"] = seed
-        if ref_wav is not None:
-            # The server schema (ServeReferenceAudio.decode_audio) accepts the audio
-            # as a base64 string when it's longer than 255 chars. Read the file and
-            # encode it; the server stores it raw, no extra wrapping.
-            audio_b64 = base64.b64encode(Path(ref_wav).read_bytes()).decode("ascii")
-            body["references"] = [{"audio": audio_b64, "text": ref_text}]
+        self._ensure_loaded()
+        from fish_speech.utils.schema import ServeReferenceAudio
 
-        url = f"{self._server_url}/v1/tts"
+        references = []
+        if ref_wav is not None:
+            references = [
+                ServeReferenceAudio(
+                    audio=Path(ref_wav).read_bytes(),
+                    text=ref_text,
+                )
+            ]
+        req = self._serve_tts_request_cls(
+            text=text,
+            references=references,
+            reference_id=None,
+            max_new_tokens=1024,
+            chunk_length=200,
+            top_p=0.8,
+            repetition_penalty=1.1,
+            temperature=0.8,
+            format="wav",
+            seed=seed,
+            use_memory_cache="off",
+            normalize=True,
+        )
+
         started = time.perf_counter()
-        # The server uses msgpack via kui; JSON also works for ServeTTSRequest because
-        # decode_audio() handles the base64 -> bytes conversion at the validator level.
-        resp = self._session.post(url, json=body, timeout=self._timeout)
+        # inference_wrapper yields header (sr+channels) then segments (int16 PCM bytes)
+        # then a final WAV-formatted bytes object. Collect everything and decode.
+        chunks = list(self._inference_wrapper(req, self._engine.tts_inference_engine))
         elapsed = time.perf_counter() - started
-        if not resp.ok:
-            raise RuntimeError(
-                f"fish-speech api_server returned HTTP {resp.status_code}: {resp.text[:500]}"
-            )
+
+        if not chunks:
+            raise RuntimeError("Fish-speech inference yielded no chunks")
+        # The 'final' chunk is a fully-formed WAV. Read it with soundfile.
         import soundfile as sf
-        buf = io.BytesIO(resp.content)
-        data, sr = sf.read(buf, dtype="float32", always_2d=True)
+        wav_bytes = chunks[-1]
+        if not isinstance(wav_bytes, (bytes, bytearray)):
+            raise RuntimeError(
+                f"Fish-speech final chunk is not bytes: {type(wav_bytes).__name__}"
+            )
+        data, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=True)
         wav = data.mean(axis=1).astype(np.float32)
         wav = resample_to_canonical(wav, sr)
         return wav, elapsed

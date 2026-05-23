@@ -69,20 +69,12 @@ PROVIDERS: dict[str, ProviderSpec] = {
         needs_reference_text=True,
         has_clone_voice_slot=False,
     ),
-    "fish_speech_s1": ProviderSpec(
-        name="fish_speech_s1",
-        default_voice_id="default_ref_en",
-        default_model_id="openaudio-s1-mini",
-        needs_api_key=None,
-        needs_reference_text=True,
-        has_clone_voice_slot=False,
-    ),
     "fish_speech_s2_pro": ProviderSpec(
         name="fish_speech_s2_pro",
         default_voice_id="default",
-        default_model_id="speech-s2-pro",
-        needs_api_key="FISH_AUDIO_API_KEY",
-        needs_reference_text=False,
+        default_model_id="s2-pro",
+        needs_api_key=None,
+        needs_reference_text=True,
         has_clone_voice_slot=False,
     ),
 }
@@ -131,19 +123,9 @@ def _build_provider(spec: ProviderSpec, manifest: dict, api_key: str | None):
             default_ref_wav=Path(ref["wav_path"]),
             default_ref_text=ref["text"],
         )
-    if spec.name == "fish_speech_s1":
-        from voice_bench.providers.fish_speech_s1 import FishSpeechS1Provider
-        first = manifest["speakers"][0]
-        ref = first["reference"]
-        return FishSpeechS1Provider(
-            default_ref_wav=Path(ref["wav_path"]),
-            default_ref_text=ref["text"],
-        )
     if spec.name == "fish_speech_s2_pro":
         from voice_bench.providers.fish_speech_s2_pro import FishSpeechS2ProProvider
-        if api_key is None:
-            raise RuntimeError("FISH_AUDIO_API_KEY missing")
-        return FishSpeechS2ProProvider(api_key=api_key)
+        return FishSpeechS2ProProvider()
     raise ValueError(f"Unknown provider: {spec.name}")
 
 
