@@ -1,23 +1,30 @@
-"""Fish Audio Speech S2 Pro provider.
+"""Fish Audio S2 Pro provider via fish-speech v2.0.0-beta api_server.
 
-S2 Pro is Fish Audio's commercial product. Unlike Fish Speech S1 it has no
-open-weight release as of May 2026 -- it is reachable only via Fish Audio's HTTP API
-(https://fish.audio). This provider therefore behaves like the ElevenLabs one: a thin
-HTTP client around the fish-audio-sdk.
+The launcher on the worker:
+  1. Clones fishaudio/fish-speech @ v2.0.0-beta (a separate branch from main/S1)
+  2. ``pip install -e .[cu129]`` (or cu126/cu128 depending on the pod's torch)
+  3. ``huggingface-cli download fishaudio/s2-pro --local-dir checkpoints/s2-pro``
+  4. Starts ``python tools/api_server.py --listen 127.0.0.1:8080`` as a background
+     subprocess, waits for /v1/health to return 200
+  5. Runs scripts/generate.py with FishSpeechS2ProProvider as a thin HTTP client
+  6. Kills the api_server subprocess on completion
 
-Install: ``pip install fish-audio-sdk`` (or fall back to a raw ``requests`` POST against
-the same endpoint). Requires ``FISH_AUDIO_API_KEY`` in the environment.
+This provider is the HTTP client side. It does not start the server itself --
+the server is process-managed by the launcher.
 
-Zero-shot voice cloning: pass a reference WAV (the SDK uploads it as part of the
-request) and target text. Reference transcript is optional but recommended.
-
-Output: MP3 / WAV bytes at 24 kHz (configurable). We always request 24 kHz mono PCM-16.
-
-NOTE: this provider costs money per request. Use --pilot on the first run, audit the
-generated sample, then confirm before running --full.
+API (fish-speech v2.0.0-beta, tools/server/views.py):
+  POST /v1/tts
+  body: {
+    "text": "<text>",
+    "format": "wav",
+    "references": [{"audio": "<base64 bytes>", "text": "<ref transcript>"}],
+    "seed": 42,
+    "use_memory_cache": "off"
+  }
+  response: WAV bytes (if streaming=false)
 """
+import base64
 import io
-import os
 import time
 from pathlib import Path
 
@@ -32,27 +39,22 @@ from voice_bench.providers._common import (
 from voice_bench.providers.base import GenerationResult
 
 
-DEFAULT_MODEL_ID = "speech-s2-pro"
+DEFAULT_MODEL_ID = "s2-pro"
+DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
 
 
 class FishSpeechS2ProProvider:
     name = "fish_speech_s2_pro"
     supports_cloning = True
 
-    def __init__(self, *, api_key: str | None = None):
-        self._api_key = api_key or os.environ.get("FISH_AUDIO_API_KEY")
-        if not self._api_key:
-            raise RuntimeError(
-                "FishSpeechS2ProProvider needs FISH_AUDIO_API_KEY in the environment "
-                "or passed via api_key= ."
-            )
+    def __init__(self, *, server_url: str = DEFAULT_SERVER_URL, request_timeout: float = 600.0):
+        self._server_url = server_url.rstrip("/")
+        self._timeout = request_timeout
         self._session = None
 
     def tts(self, text, voice_id, model_id=DEFAULT_MODEL_ID, *, seed=None):
-        del voice_id  # The Fish API picks a default voice when no reference is supplied.
-        wav, elapsed = self._infer(
-            text=text, ref_wav=None, ref_text=None, model_id=model_id, seed=seed
-        )
+        del voice_id
+        wav, elapsed = self._infer(text=text, ref_wav=None, ref_text=None, seed=seed)
         return GenerationResult(
             audio_pcm=float_to_pcm16_bytes(wav),
             sample_rate=SAMPLE_RATE_CANONICAL,
@@ -71,13 +73,12 @@ class FishSpeechS2ProProvider:
     def clone(self, text, reference_wav_path, model_id=DEFAULT_MODEL_ID, *, seed=None, reference_text=None):
         ref_path = Path(reference_wav_path)
         ref_text = reference_text or read_normalized_txt_alongside(ref_path)
-        wav, elapsed = self._infer(
-            text=text,
-            ref_wav=ref_path,
-            ref_text=ref_text,
-            model_id=model_id,
-            seed=seed,
-        )
+        if not ref_text:
+            raise RuntimeError(
+                f"FishSpeech S2 Pro clone() needs the reference transcript. "
+                f"Pass reference_text=, or place a .normalized.txt next to {ref_path}."
+            )
+        wav, elapsed = self._infer(text=text, ref_wav=ref_path, ref_text=ref_text, seed=seed)
         return GenerationResult(
             audio_pcm=float_to_pcm16_bytes(wav),
             sample_rate=SAMPLE_RATE_CANONICAL,
@@ -94,49 +95,47 @@ class FishSpeechS2ProProvider:
         )
 
     def cleanup(self):
-        self._session = None
+        if self._session is not None:
+            self._session.close()
+            self._session = None
 
     # -- internals -------------------------------------------------------------
 
     def _ensure_session(self):
-        if self._session is not None:
-            return
-        try:
-            from fish_audio_sdk import Session
-            self._session = Session(self._api_key)
-        except ImportError as e:
-            raise RuntimeError(
-                "fish-audio-sdk is not installed. Run `pip install fish-audio-sdk`."
-            ) from e
+        if self._session is None:
+            import requests
+            self._session = requests.Session()
 
-    def _infer(self, *, text, ref_wav, ref_text, model_id, seed):
+    def _infer(self, *, text, ref_wav, ref_text, seed):
         self._ensure_session()
-        # Lazy import to keep this module CPU-importable on dev boxes without the SDK.
-        from fish_audio_sdk import TTSRequest, ReferenceAudio
-
-        request_kwargs: dict = {"text": text, "format": "wav", "mp3_bitrate": 0}
-        # The SDK currently exposes ``backend=`` for picking the model family (s1 vs s2-pro etc).
-        request_kwargs["backend"] = model_id
+        body: dict = {
+            "text": text,
+            "format": "wav",
+            "references": [],
+            "use_memory_cache": "off",
+            "normalize": True,
+        }
         if seed is not None:
-            request_kwargs["seed"] = seed
-
+            body["seed"] = seed
         if ref_wav is not None:
-            with open(ref_wav, "rb") as f:
-                audio_bytes = f.read()
-            request_kwargs["references"] = [
-                ReferenceAudio(audio=audio_bytes, text=ref_text or "")
-            ]
+            # The server schema (ServeReferenceAudio.decode_audio) accepts the audio
+            # as a base64 string when it's longer than 255 chars. Read the file and
+            # encode it; the server stores it raw, no extra wrapping.
+            audio_b64 = base64.b64encode(Path(ref_wav).read_bytes()).decode("ascii")
+            body["references"] = [{"audio": audio_b64, "text": ref_text}]
 
+        url = f"{self._server_url}/v1/tts"
         started = time.perf_counter()
-        # ``session.tts`` returns a streaming iterator of bytes chunks.
-        buf = io.BytesIO()
-        for chunk in self._session.tts(TTSRequest(**request_kwargs)):
-            buf.write(chunk)
+        # The server uses msgpack via kui; JSON also works for ServeTTSRequest because
+        # decode_audio() handles the base64 -> bytes conversion at the validator level.
+        resp = self._session.post(url, json=body, timeout=self._timeout)
         elapsed = time.perf_counter() - started
-
-        # Decode the WAV bytes the API returned. soundfile handles arbitrary container SRs.
+        if not resp.ok:
+            raise RuntimeError(
+                f"fish-speech api_server returned HTTP {resp.status_code}: {resp.text[:500]}"
+            )
         import soundfile as sf
-        buf.seek(0)
+        buf = io.BytesIO(resp.content)
         data, sr = sf.read(buf, dtype="float32", always_2d=True)
         wav = data.mean(axis=1).astype(np.float32)
         wav = resample_to_canonical(wav, sr)
