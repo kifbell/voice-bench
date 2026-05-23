@@ -126,6 +126,14 @@ class CosyVoice2Provider:
     def _ensure_loaded(self):
         if self._model is not None:
             return
+        from pathlib import Path
+        if not Path(self._model_dir).exists():
+            # Pull the official checkpoint from ModelScope into MODELSCOPE_CACHE.
+            from modelscope import snapshot_download
+            self._model_dir = snapshot_download(
+                "iic/CosyVoice2-0.5B",
+                local_dir=self._model_dir if isinstance(self._model_dir, str) else None,
+            )
         from cosyvoice.cli.cosyvoice import CosyVoice2
         self._model = CosyVoice2(
             self._model_dir,
