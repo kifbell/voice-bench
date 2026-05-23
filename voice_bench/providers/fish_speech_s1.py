@@ -1,4 +1,4 @@
-"""Fish Audio OpenAudio S1 (Fish Speech S1 / fishaudio/openaudio-s1-mini).
+"""Fish Audio OpenAudio S1 (Fish Speech S1 / fishaudio/s1-mini).
 
 Two-stage TTS: an autoregressive LLM emits acoustic tokens, then a firefly-gan vocoder
 decodes them to waveform. The model needs both checkpoints downloaded ahead of time
@@ -7,13 +7,13 @@ into ``--model-dir``.
 Install:
     git clone https://github.com/fishaudio/fish-speech.git /tmp/fish-speech
     cd /tmp/fish-speech && pip install -e .
-    huggingface-cli download fishaudio/openaudio-s1-mini --local-dir checkpoints/openaudio-s1-mini
+    huggingface-cli download fishaudio/s1-mini --local-dir checkpoints/s1-mini
 
 Zero-shot voice cloning at inference: pass ref WAV + ref transcript + target text. The
 provider's tts() task uses a fixed default reference clip (same shape as F5 / CosyVoice 2
 providers).
 
-License: code under Apache-2.0; openaudio-s1-mini weights under Apache-2.0 (verify the
+License: code under Apache-2.0; s1-mini weights under Apache-2.0 (verify the
 exact LICENSE in the HF repo). The full S1 (non-mini) may be CC-BY-NC -- prefer the mini
 checkpoint for the benchmark.
 
@@ -34,7 +34,7 @@ from voice_bench.providers._common import (
 from voice_bench.providers.base import GenerationResult
 
 
-DEFAULT_MODEL_ID = "openaudio-s1-mini"
+DEFAULT_MODEL_ID = "s1-mini"
 
 
 class FishSpeechS1Provider:
@@ -54,7 +54,7 @@ class FishSpeechS1Provider:
     ):
         self._device = device
         # If unset, expect ``HF_HOME``-style auto-resolution -- the inference engine
-        # will look up ``fishaudio/openaudio-s1-mini`` via huggingface_hub.
+        # will look up ``fishaudio/s1-mini`` via huggingface_hub.
         self._checkpoint_dir = (
             Path(checkpoint_dir) if checkpoint_dir else None
         )
@@ -151,7 +151,7 @@ class FishSpeechS1Provider:
                 ckpt_dir = self._checkpoint_dir or Path(
                     os.environ.get(
                         "FISH_SPEECH_CHECKPOINT_DIR",
-                        "checkpoints/openaudio-s1-mini",
+                        "checkpoints/s1-mini",
                     )
                 )
                 # Different versions of fish_speech use different kwargs; try the most
