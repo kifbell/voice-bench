@@ -43,11 +43,12 @@ def patch_torchaudio_legacy_apis():
 
 
 def patch_torchaudio_load_to_soundfile():
-    """Replace torchaudio.load (which dispatches via torchcodec on 2.9+) with soundfile.
+    """Replace torchaudio.load + torchaudio._torchcodec.load_with_torchcodec with soundfile.
 
     Octopus worker pods don't ship ffmpeg; torchcodec dlopens libavutil at runtime
-    and fails. Wrap torchaudio.load so any caller (fish-speech reference_loader,
-    coqui XTTS, F5) gets a (Tensor[ch,T], int sr) tuple via soundfile.
+    and fails. Patch the public torchaudio.load AND the underlying load_with_torchcodec
+    helper that torchaudio>=2.9 dispatches to internally, in case some callers reach
+    it directly. soundfile handles both path strings and file-like (BytesIO) objects.
     """
     import numpy as np
     import soundfile as sf
@@ -56,11 +57,15 @@ def patch_torchaudio_load_to_soundfile():
 
     def _sf_load(uri, *args, **kwargs):
         del args, kwargs
-        # uri can be a path-like (Path/str) or a file-like object (BytesIO).
-        # soundfile.read handles both directly; the buggy old version stringified
-        # the BytesIO instance into '<_io.BytesIO ...>' which then can't open.
         target = uri if hasattr(uri, "read") else str(uri)
         data, sr = sf.read(target, dtype="float32", always_2d=True)
         return torch.from_numpy(np.ascontiguousarray(data.T)), int(sr)
 
     torchaudio.load = _sf_load
+    # Also patch the internal torchcodec dispatcher; some callers (torchaudio>=2.9)
+    # bypass torchaudio.load and go straight here.
+    try:
+        import torchaudio._torchcodec as _tc
+        _tc.load_with_torchcodec = _sf_load
+    except ImportError:
+        pass
