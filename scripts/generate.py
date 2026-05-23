@@ -101,6 +101,14 @@ PROVIDERS: dict[str, ProviderSpec] = {
         needs_reference_text=False,
         has_clone_voice_slot=False,
     ),
+    "openai_tts": ProviderSpec(
+        name="openai_tts",
+        default_voice_id="alloy",
+        default_model_id="tts-1",
+        needs_api_key="OPENAI_API_KEY",
+        needs_reference_text=False,
+        has_clone_voice_slot=False,
+    ),
 }
 
 
@@ -159,6 +167,11 @@ def _build_provider(spec: ProviderSpec, manifest: dict, api_key: str | None):
     if spec.name == "google_tts":
         from voice_bench.providers.google_tts import GoogleTtsProvider
         return GoogleTtsProvider()
+    if spec.name == "openai_tts":
+        from voice_bench.providers.openai_tts import OpenaiTtsProvider
+        if api_key is None:
+            raise RuntimeError("OPENAI_API_KEY missing")
+        return OpenaiTtsProvider(api_key=api_key)
     raise ValueError(f"Unknown provider: {spec.name}")
 
 
