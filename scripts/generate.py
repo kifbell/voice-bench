@@ -85,6 +85,22 @@ PROVIDERS: dict[str, ProviderSpec] = {
         needs_reference_text=True,
         has_clone_voice_slot=False,
     ),
+    "azure_tts": ProviderSpec(
+        name="azure_tts",
+        default_voice_id="en-US-AvaMultilingualNeural",
+        default_model_id="azure-neural",
+        needs_api_key="AZURE_SPEECH_KEY",
+        needs_reference_text=False,
+        has_clone_voice_slot=False,
+    ),
+    "google_tts": ProviderSpec(
+        name="google_tts",
+        default_voice_id="en-US-Neural2-F",
+        default_model_id="google-neural2",
+        needs_api_key=None,
+        needs_reference_text=False,
+        has_clone_voice_slot=False,
+    ),
 }
 
 
@@ -137,6 +153,12 @@ def _build_provider(spec: ProviderSpec, manifest: dict, api_key: str | None):
     if spec.name == "fish_speech_s2_pro":
         from voice_bench.providers.fish_speech_s2_pro import FishSpeechS2ProProvider
         return FishSpeechS2ProProvider()
+    if spec.name == "azure_tts":
+        from voice_bench.providers.azure_tts import AzureTtsProvider
+        return AzureTtsProvider()
+    if spec.name == "google_tts":
+        from voice_bench.providers.google_tts import GoogleTtsProvider
+        return GoogleTtsProvider()
     raise ValueError(f"Unknown provider: {spec.name}")
 
 
