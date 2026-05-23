@@ -69,6 +69,14 @@ PROVIDERS: dict[str, ProviderSpec] = {
         needs_reference_text=True,
         has_clone_voice_slot=False,
     ),
+    "fish_speech_s1": ProviderSpec(
+        name="fish_speech_s1",
+        default_voice_id="default",
+        default_model_id="s1-mini",
+        needs_api_key=None,
+        needs_reference_text=True,
+        has_clone_voice_slot=False,
+    ),
     "fish_speech_s2_pro": ProviderSpec(
         name="fish_speech_s2_pro",
         default_voice_id="default",
@@ -123,6 +131,9 @@ def _build_provider(spec: ProviderSpec, manifest: dict, api_key: str | None):
             default_ref_wav=Path(ref["wav_path"]),
             default_ref_text=ref["text"],
         )
+    if spec.name == "fish_speech_s1":
+        from voice_bench.providers.fish_speech_s1 import FishSpeechS1Provider
+        return FishSpeechS1Provider()
     if spec.name == "fish_speech_s2_pro":
         from voice_bench.providers.fish_speech_s2_pro import FishSpeechS2ProProvider
         return FishSpeechS2ProProvider()
