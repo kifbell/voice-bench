@@ -150,23 +150,18 @@ class CosyVoice2Provider:
             if torch.cuda.is_available():
                 torch.cuda.manual_seed_all(seed)
 
-        # CosyVoice 2's inference_zero_shot wants prompt speech at 16 kHz mono as a
-        # torch.Tensor with shape [1, T] (or [T]).
-        import soundfile as sf
+        # CosyVoice 2 expects ``prompt_wav`` to be a path to a WAV file; the frontend
+        # then calls ``load_wav`` internally and resamples to 16 / 24 kHz as needed.
+        # See cosyvoice.cli.frontend._extract_speech_token.
         import torch
-        data, sr = sf.read(str(ref_wav), dtype="float32", always_2d=True)
-        mono = data.mean(axis=1)
-        prompt = torch.from_numpy(np.ascontiguousarray(mono))[None, :]
-        if sr != 16000:
-            import torchaudio.functional as F
-            prompt = F.resample(prompt, sr, 16000)
+        prompt_path = str(ref_wav)
 
         started = time.perf_counter()
         chunks = []
         for out in self._model.inference_zero_shot(
             gen_text,
             ref_text,
-            prompt,
+            prompt_path,
             stream=False,
         ):
             chunks.append(out["tts_speech"])
