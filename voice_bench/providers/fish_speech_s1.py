@@ -107,8 +107,12 @@ class FishSpeechS1Provider:
     def _ensure_loaded(self):
         if self._engine is not None:
             return
-        from voice_bench.providers._common import patch_torchaudio_legacy_apis
+        from voice_bench.providers._common import (
+            patch_torchaudio_legacy_apis,
+            patch_torchaudio_load_to_soundfile,
+        )
         patch_torchaudio_legacy_apis()
+        patch_torchaudio_load_to_soundfile()
         import pyrootutils
         pyrootutils.set_root(
             path=self._fish_repo,
@@ -157,19 +161,33 @@ class FishSpeechS1Provider:
             normalize=True,
         )
 
+        import torch
         started = time.perf_counter()
+        # inference_wrapper yields: header (tuple of (sr, channels)), then 'segment'
+        # chunks (int16 PCM bytes), then a 'final' chunk (raw float numpy array).
+        # The final one is the full waveform -- prefer it when present, otherwise
+        # concatenate the int16 segments.
         chunks = list(self._inference_wrapper(req, self._engine.tts_inference_engine))
         elapsed = time.perf_counter() - started
-
         if not chunks:
-            raise RuntimeError("Fish-speech S1 inference yielded no chunks")
-        import soundfile as sf
-        wav_bytes = chunks[-1]
-        if not isinstance(wav_bytes, (bytes, bytearray)):
+            raise RuntimeError("Fish-speech inference yielded no chunks")
+        last = chunks[-1]
+        if isinstance(last, np.ndarray):
+            wav = np.asarray(last, dtype=np.float32).squeeze()
+        elif isinstance(last, torch.Tensor):
+            wav = last.detach().cpu().numpy().astype(np.float32).squeeze()
+        elif isinstance(last, (bytes, bytearray)):
+            # Concatenate every byte segment (skip header tuple) then decode as int16.
+            pcm = b"".join(c for c in chunks if isinstance(c, (bytes, bytearray)))
+            wav = (np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0)
+        else:
             raise RuntimeError(
-                f"Fish-speech S1 final chunk is not bytes: {type(wav_bytes).__name__}"
+                f"Fish-speech final chunk has unexpected type: {type(last).__name__}"
             )
-        data, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=True)
-        wav = data.mean(axis=1).astype(np.float32)
+        # Release GPU caches after each inference to keep VRAM headroom.
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        # ModelManager streams at the codec's native rate (~44.1 kHz); resample to 24k.
+        sr = getattr(self._engine.tts_inference_engine, "sample_rate", None) or 44100
         wav = resample_to_canonical(wav, sr)
         return wav, elapsed

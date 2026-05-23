@@ -40,3 +40,23 @@ def patch_torchaudio_legacy_apis():
     import torchaudio
     if not hasattr(torchaudio, "list_audio_backends"):
         torchaudio.list_audio_backends = lambda: ["soundfile"]
+
+
+def patch_torchaudio_load_to_soundfile():
+    """Replace torchaudio.load (which dispatches via torchcodec on 2.9+) with soundfile.
+
+    Octopus worker pods don't ship ffmpeg; torchcodec dlopens libavutil at runtime
+    and fails. Wrap torchaudio.load so any caller (fish-speech reference_loader,
+    coqui XTTS, F5) gets a (Tensor[ch,T], int sr) tuple via soundfile.
+    """
+    import numpy as np
+    import soundfile as sf
+    import torch
+    import torchaudio
+
+    def _sf_load(uri, *args, **kwargs):
+        del args, kwargs
+        data, sr = sf.read(str(uri), dtype="float32", always_2d=True)
+        return torch.from_numpy(np.ascontiguousarray(data.T)), int(sr)
+
+    torchaudio.load = _sf_load
