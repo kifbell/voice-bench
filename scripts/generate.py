@@ -39,7 +39,7 @@ class ProviderSpec:
 PROVIDERS: dict[str, ProviderSpec] = {
     "elevenlabs": ProviderSpec(
         name="elevenlabs",
-        default_voice_id="21m00Tcm4TlvDq8ikWAM",  # Rachel: neutral female
+        default_voice_id="9BWtsMINqrJLrRacOk9x",  # Aria: free-tier accessible default voice
         default_model_id="eleven_multilingual_v2",
         needs_api_key="ELEVENLABS_API_KEY",
         needs_reference_text=False,
