@@ -1,14 +1,17 @@
-"""Resemble AI provider — TTS + Rapid/Instant Voice Cloning.
+"""Resemble AI Rapid Voice Clone provider — cloning ONLY.
 
-SDK: pip install resemble; from resemble import Resemble
-Auth: Resemble.api_key("...")
-TTS: Resemble.v2.clips.create_sync(...)
-Cloning: Resemble.v2.voices.create + Resemble.v2.voices.build (async, poll)
+Uses the Rapid Voice Clone flow (voice_type='rapid'):
+  1. Upload reference WAV to a public URL (catbox.moe -- anonymous, no API key).
+  2. POST voices.create(name, dataset_url=<url>, voice_type='rapid', consent=...).
+  3. Poll voices.get(uuid) until voice_status == 'Ready' (~30-60 s).
+  4. Synthesise via clips.create_sync(voice_uuid, project_uuid, body=text).
+  5. Cleanup deletes the voice to free the slot.
 
-Output: Clip object has .audio_src URL or raw bytes; varies. SDK details:
-https://docs.resemble.ai/api-reference/text-to-speech/synthesize
+Free Flex tier gives 1 voice clone slot; additional are $2/voice/mo. Our caller
+limits speakers via --max-speakers since slot budget is the bottleneck.
 
-We default to a project + voice picked at runtime from the account's catalogue.
+Note: Resemble's `voices.create` returns nested under `.item` on success, but
+on failure (e.g. no slots) returns `{success: false, message: ...}` -- handle both.
 """
 import io
 import os
@@ -16,6 +19,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import requests
 
 from voice_bench.providers._common import (
     SAMPLE_RATE_CANONICAL,
@@ -26,7 +30,10 @@ from voice_bench.providers._common import (
 from voice_bench.providers.base import GenerationResult
 
 
-DEFAULT_MODEL_ID = "resemble-v2"
+DEFAULT_MODEL_ID = "resemble-rapid"
+# We need a public HTTP URL Resemble can pull from. Catbox started returning 0-byte
+# files when used repeatedly; tmpfiles.org is more reliable for short-lived uploads.
+TMPFILES_UPLOAD_URL = "https://tmpfiles.org/api/v1/upload"
 
 
 class ResembleProvider:
@@ -38,10 +45,8 @@ class ResembleProvider:
         if not self._api_key:
             raise RuntimeError("ResembleProvider needs RESEMBLE_API_KEY")
         self._initialised = False
-        self._default_voice_uuid: str | None = None
         self._project_uuid: str | None = None
-        # Per-speaker cache so we don't rebuild a voice for each utterance.
-        self._clone_voices: dict[str, str] = {}
+        self._clone_voices: dict[str, str] = {}  # ref_path -> voice_uuid
 
     def _ensure(self):
         if self._initialised:
@@ -49,55 +54,38 @@ class ResembleProvider:
         from resemble import Resemble
         Resemble.api_key(self._api_key)
         self._initialised = True
-        self._select_default_voice_and_project()
+        self._select_or_create_project()
 
-    def _select_default_voice_and_project(self):
+    def _select_or_create_project(self):
         from resemble import Resemble
-        # Project: pick the first project, or create one named "voicebench".
         try:
             projects = Resemble.v2.projects.all(1, 50).get("items", [])
         except Exception:
             projects = []
-        if not projects:
-            res = Resemble.v2.projects.create(
-                name="voicebench",
-                description="voice-bench experiment runs",
-                public=False,
-                archived=False,
-            )
-            self._project_uuid = res["item"]["uuid"]
-        else:
+        if projects:
             self._project_uuid = projects[0]["uuid"]
+            return
+        # No project yet -- create one.
+        res = Resemble.v2.projects.create(
+            name="voicebench",
+            description="voice-bench benchmark project",
+            public=False,
+            archived=False,
+        )
+        self._project_uuid = res["item"]["uuid"]
 
-        # Voice: pick first ready voice from the account's catalogue.
-        try:
-            voices = Resemble.v2.voices.all(1, 50).get("items", [])
-        except Exception:
-            voices = []
-        for v in voices:
-            if v.get("status") == "ready" or not v.get("status"):
-                self._default_voice_uuid = v["uuid"]
-                break
-        if not self._default_voice_uuid and voices:
-            self._default_voice_uuid = voices[0]["uuid"]
-
-    def tts(self, text, voice_id="", model_id=DEFAULT_MODEL_ID, *, seed=None):
-        # Resemble is included in voice-bench ONLY for the cloning task; the TTS
-        # column is intentionally left empty (no default-voice generation).
+    def tts(self, text, voice_id, model_id=DEFAULT_MODEL_ID, *, seed=None):
         raise NotImplementedError(
-            "ResembleProvider is voice-cloning only; --tasks tts is disabled. "
-            "Run with --tasks cloning."
+            "ResembleProvider is cloning-only; run with --tasks cloning."
         )
 
     def clone(self, text, reference_wav_path, model_id=DEFAULT_MODEL_ID, *, seed=None, reference_text=None):
         del seed
         self._ensure()
         ref_path = Path(reference_wav_path)
-        cached = self._clone_voices.get(str(ref_path))
-        if cached:
-            clone_uuid = cached
-        else:
-            clone_uuid = self._build_clone_voice(ref_path, reference_text)
+        clone_uuid = self._clone_voices.get(str(ref_path))
+        if not clone_uuid:
+            clone_uuid = self._create_rapid_clone(ref_path)
             self._clone_voices[str(ref_path)] = clone_uuid
 
         wav, sr, elapsed = self._synthesize(voice_uuid=clone_uuid, text=text)
@@ -130,71 +118,83 @@ class ResembleProvider:
 
     # -- internals -------------------------------------------------------------
 
+    def _upload_public(self, ref_path: Path) -> str:
+        """Anonymous upload to tmpfiles.org; returns direct-download public URL.
+
+        tmpfiles wraps the upload in a viewer page; the API URL needs a /dl/ injection
+        to become a direct binary download (so Resemble can curl it).
+        """
+        with open(ref_path, "rb") as f:
+            files = {"file": (ref_path.name, f, "audio/wav")}
+            r = requests.post(TMPFILES_UPLOAD_URL, files=files, timeout=120)
+        r.raise_for_status()
+        viewer_url = r.json()["data"]["url"]
+        direct = viewer_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+        return direct
+
+    def _create_rapid_clone(self, ref_path: Path) -> str:
+        """Create Resemble rapid voice clone with dataset_url, explicitly trigger build, poll.
+
+        Per https://docs.resemble.ai/voice-creation/voices/clone-overview :
+        Rapid clones DO NOT auto-train from a dataset_url -- you must call build()
+        after voices.create() to start training.
+
+        Training takes <1 minute per docs; status reaches 'finished' when ready.
+        """
+        from resemble import Resemble
+        dataset_url = self._upload_public(ref_path)
+        res = Resemble.v2.voices.create(
+            name=f"vb_{ref_path.stem}"[:30],
+            dataset_url=dataset_url,
+            voice_type="rapid",
+            consent="I have the legal right to clone this voice for academic research benchmarking.",
+        )
+        if not res.get("success"):
+            raise RuntimeError(f"Resemble voices.create failed: {res!r}")
+        voice_uuid = res["item"]["uuid"]
+
+        # Explicitly trigger training. Docs say rapid clones need this call even when
+        # dataset_url is provided; only professional voices auto-train.
+        build_res = Resemble.v2.voices.build(voice_uuid)
+        if isinstance(build_res, dict) and build_res.get("success") is False:
+            raise RuntimeError(f"Resemble voices.build({voice_uuid}) failed: {build_res!r}")
+
+        # Poll until status reaches 'finished' (or 'Ready'). Docs claim <1 min for rapid.
+        deadline = time.time() + 600
+        last_status = None
+        while time.time() < deadline:
+            status_resp = Resemble.v2.voices.get(voice_uuid)
+            item = status_resp.get("item") or {}
+            # Two possible fields per API version: `status` and `voice_status`.
+            status = item.get("status") or item.get("voice_status")
+            if status != last_status:
+                last_status = status
+            if status in ("finished", "Ready"):
+                return voice_uuid
+            if status in ("failed", "error", "Failed", "Error"):
+                raise RuntimeError(f"Resemble voice {voice_uuid} build failed: {status_resp!r}")
+            time.sleep(5)
+        raise RuntimeError(
+            f"Resemble voice {voice_uuid} not ready within 10 min; last status={last_status}"
+        )
+
     def _synthesize(self, *, voice_uuid: str, text: str) -> tuple[np.ndarray, int, float]:
         from resemble import Resemble
         started = time.perf_counter()
-        # Sync clip creation -- blocks until WAV is ready, returns URL or bytes.
-        try:
-            resp = Resemble.v2.clips.create_sync(
-                project_uuid=self._project_uuid,
-                voice_uuid=voice_uuid,
-                body=text,
-                title=text[:60],
-            )
-        except TypeError:
-            resp = Resemble.v2.clips.create_sync(self._project_uuid, voice_uuid, text)
+        resp = Resemble.v2.clips.create_sync(
+            project_uuid=self._project_uuid,
+            voice_uuid=voice_uuid,
+            body=text,
+            title=text[:60],
+        )
         elapsed = time.perf_counter() - started
-
-        item = resp.get("item", resp) if isinstance(resp, dict) else resp
+        if not resp.get("success", True):
+            raise RuntimeError(f"Resemble clips.create_sync failed: {resp!r}")
+        item = resp.get("item", resp)
         audio_src = item.get("audio_src") if isinstance(item, dict) else getattr(item, "audio_src", None)
         if not audio_src:
             raise RuntimeError(f"Resemble clip response missing audio_src: {resp!r}")
-
-        import requests, soundfile as sf
+        import soundfile as sf
         buf = requests.get(audio_src, timeout=60).content
         data, sr = sf.read(io.BytesIO(buf), dtype="float32", always_2d=True)
         return data.mean(axis=1).astype(np.float32), int(sr), elapsed
-
-    def _build_clone_voice(self, ref_path: Path, reference_text: str | None) -> str:
-        """Create voice, upload ref recording, build, poll until ready."""
-        from resemble import Resemble
-        # Create empty voice.
-        res = Resemble.v2.voices.create(
-            name=f"voicebench_{ref_path.stem}",
-            dataset_url=None,
-            consent="I have permission to clone this voice for research benchmark.",
-        )
-        voice_uuid = res["item"]["uuid"]
-        # Upload reference recording.
-        ref_text = reference_text or read_normalized_txt_alongside(ref_path) or ref_path.stem
-        try:
-            with open(ref_path, "rb") as f:
-                Resemble.v2.recordings.create(
-                    voice_uuid=voice_uuid,
-                    file=f,
-                    name=ref_path.stem,
-                    text=ref_text,
-                    is_active=True,
-                    emotion="neutral",
-                )
-        except TypeError:
-            with open(ref_path, "rb") as f:
-                Resemble.v2.recordings.create(voice_uuid, f, ref_path.stem, ref_text, True, "neutral")
-
-        # Trigger build.
-        try:
-            Resemble.v2.voices.build(voice_uuid)
-        except AttributeError:
-            pass  # some versions auto-build on first recording
-
-        # Poll until ready (timeout 5 min).
-        deadline = time.time() + 300
-        while time.time() < deadline:
-            status_resp = Resemble.v2.voices.get(voice_uuid)
-            status = (status_resp.get("item", {}) or {}).get("status")
-            if status == "ready":
-                return voice_uuid
-            if status in ("failed", "error"):
-                raise RuntimeError(f"Resemble voice {voice_uuid} build failed: {status_resp!r}")
-            time.sleep(10)
-        raise RuntimeError(f"Resemble voice {voice_uuid} did not become ready within 5 min")

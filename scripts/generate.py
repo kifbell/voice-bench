@@ -112,7 +112,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
     "typecast": ProviderSpec(
         name="typecast",
         default_voice_id="",
-        default_model_id="typecast-tts",
+        default_model_id="ssfm-v30",
         needs_api_key="TYPECAST_API_KEY",
         needs_reference_text=False,
         has_clone_voice_slot=True,

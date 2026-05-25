@@ -83,6 +83,16 @@ def main() -> int:
     out_path = root / args.out if not Path(args.out).is_absolute() else Path(args.out)
 
     sidecars = sorted(sidecars_root.rglob("*.json"))
+    # Filter to actual audio sidecars: must have 'provider' + 'task' + 'wav_path'.
+    # This skips non-sidecar JSONs like calibration_anchors.json that may live in
+    # the same outputs tree.
+    def _is_sidecar(p):
+        try:
+            d = json.loads(p.read_text())
+            return all(k in d for k in ("provider", "task", "wav_path", "utt_id"))
+        except Exception:
+            return False
+    sidecars = [p for p in sidecars if _is_sidecar(p)]
     if not sidecars:
         print(f"No sidecars found under {sidecars_root}", file=sys.stderr)
         return 1

@@ -62,7 +62,7 @@ class TypecastProvider:
         ref_path = Path(reference_wav_path)
         clone_voice_id = self._clone_voice_cache.get(str(ref_path))
         if not clone_voice_id:
-            clone_voice_id = self._create_clone_voice(ref_path)
+            clone_voice_id = self._create_clone_voice(ref_path, model_id=model_id)
             self._clone_voice_cache[str(ref_path)] = clone_voice_id
 
         wav, sr, elapsed = self._synthesize(text=text, voice_id=clone_voice_id, model_id=model_id)
@@ -101,47 +101,32 @@ class TypecastProvider:
 
     # -- internals -------------------------------------------------------------
 
-    def _create_clone_voice(self, ref_path: Path) -> str:
-        """POST /v1/instant-voice-cloning to upload reference WAV, returns voice_id."""
-        # Endpoint shape: multipart POST with audio file. The exact field name varies
-        # between API versions; try a couple of common shapes.
-        # Per https://typecast.ai/docs/api-reference/voices/instant-cloning#instant-cloning
-        # the canonical endpoint sits under /voices/instant-cloning. We try the few
-        # common multipart field names since the doc doesn't pin one.
-        candidates = (
-            ("/v1/voices/instant-cloning", "voice_file"),
-            ("/v1/voices/instant-cloning", "audio"),
-            ("/v1/voices/instant-cloning", "file"),
-            ("/v1/instant-voice-cloning", "voice_file"),
-            ("/v1/instant-voice-cloning", "audio"),
-        )
-        last_err: Exception | None = None
-        for endpoint, file_field in candidates:
-            try:
-                with open(ref_path, "rb") as f:
-                    files = {file_field: (ref_path.name, f, "audio/wav")}
-                    data = {"name": f"voicebench_{ref_path.stem}"}
-                    r = self._session.post(
-                        f"{TYPECAST_API_HOST}{endpoint}",
-                        files=files,
-                        data=data,
-                        timeout=120,
-                    )
-                if r.status_code in (200, 201):
-                    j = r.json()
-                    for k in ("voice_id", "id", "uuid"):
-                        if k in j:
-                            return j[k]
-                    if "voice" in j and isinstance(j["voice"], dict):
-                        for k in ("voice_id", "id", "uuid"):
-                            if k in j["voice"]:
-                                return j["voice"][k]
-                    raise RuntimeError(f"unexpected response: {j!r}")
-                last_err = RuntimeError(f"HTTP {r.status_code} from {endpoint}: {r.text[:300]}")
-            except Exception as e:
-                last_err = e
-                continue
-        raise RuntimeError(f"Typecast IVC failed across {len(candidates)} endpoint candidates: {last_err}")
+    def _create_clone_voice(self, ref_path: Path, model_id: str) -> str:
+        """POST /v1/voices/clone — multipart with file/name/model. Returns voice_id (uc_*).
+
+        Per the official docs:
+        https://typecast.ai/docs/api-reference/voices/instant-cloning#instant-cloning
+        """
+        # name must be 1-30 chars; ref_path.stem can exceed that for some LibriTTS ids.
+        name = f"voicebench_{ref_path.stem}"[:30]
+        with open(ref_path, "rb") as f:
+            files = {"file": (ref_path.name, f, "audio/wav")}
+            data = {"name": name, "model": model_id}
+            r = self._session.post(
+                f"{TYPECAST_API_HOST}/v1/voices/clone",
+                files=files,
+                data=data,
+                timeout=120,
+            )
+        if r.status_code not in (200, 201):
+            raise RuntimeError(
+                f"Typecast IVC POST /v1/voices/clone returned "
+                f"HTTP {r.status_code}: {r.text[:300]}"
+            )
+        voice_id = r.json().get("voice_id")
+        if not voice_id:
+            raise RuntimeError(f"Typecast IVC response missing voice_id: {r.text[:300]}")
+        return voice_id
 
     def _synthesize(self, *, text: str, voice_id: str, model_id: str) -> tuple[np.ndarray, int, float]:
         from typecast.models import TTSRequest, TTSModel
