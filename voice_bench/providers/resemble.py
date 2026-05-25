@@ -179,22 +179,28 @@ class ResembleProvider:
         )
 
     def _synthesize(self, *, voice_uuid: str, text: str) -> tuple[np.ndarray, int, float]:
+        """Use clips.create_direct (Resemble's synthesis cluster) -- not clips.create_sync.
+
+        create_sync (app.resemble.ai/api/v2/projects/{uuid}/clips) returns
+        {'success': False, 'message': 'Synthesis failed!'} for our account.
+        create_direct (f.cluster.resemble.ai/synthesize) actually returns the audio
+        as base64-encoded WAV in audio_content. Both endpoints exist in the SDK.
+        """
         from resemble import Resemble
+        import base64
         started = time.perf_counter()
-        resp = Resemble.v2.clips.create_sync(
+        resp = Resemble.v2.clips.create_direct(
             project_uuid=self._project_uuid,
             voice_uuid=voice_uuid,
-            body=text,
-            title=text[:60],
+            data=text,
         )
         elapsed = time.perf_counter() - started
-        if not resp.get("success", True):
-            raise RuntimeError(f"Resemble clips.create_sync failed: {resp!r}")
-        item = resp.get("item", resp)
-        audio_src = item.get("audio_src") if isinstance(item, dict) else getattr(item, "audio_src", None)
-        if not audio_src:
-            raise RuntimeError(f"Resemble clip response missing audio_src: {resp!r}")
+        if not resp.get("success"):
+            raise RuntimeError(f"Resemble clips.create_direct failed: {resp!r}")
+        audio_b64 = resp.get("audio_content")
+        if not audio_b64:
+            raise RuntimeError(f"Resemble create_direct missing audio_content: {resp!r}")
+        wav_bytes = base64.b64decode(audio_b64)
         import soundfile as sf
-        buf = requests.get(audio_src, timeout=60).content
-        data, sr = sf.read(io.BytesIO(buf), dtype="float32", always_2d=True)
+        data, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=True)
         return data.mean(axis=1).astype(np.float32), int(sr), elapsed
