@@ -85,6 +85,11 @@ class ResembleProvider:
         ref_path = Path(reference_wav_path)
         clone_uuid = self._clone_voices.get(str(ref_path))
         if not clone_uuid:
+            # Slot recycling: Flex plan has only 1-2 voice clone slots. Delete
+            # any previously-cached voices for OTHER references before creating
+            # the new one. The currently-active one (for this reference) is
+            # cached above and re-used across multiple targets.
+            self._recycle_other_slots(keep_ref=str(ref_path))
             clone_uuid = self._create_rapid_clone(ref_path)
             self._clone_voices[str(ref_path)] = clone_uuid
 
@@ -104,6 +109,18 @@ class ResembleProvider:
             seed=None,
             reference_wav_path=str(ref_path.resolve()),
         )
+
+    def _recycle_other_slots(self, keep_ref: str) -> None:
+        """Delete all cached voices except the one for keep_ref. Frees Flex slots."""
+        from resemble import Resemble
+        for ref, vid in list(self._clone_voices.items()):
+            if ref == keep_ref:
+                continue
+            try:
+                Resemble.v2.voices.delete(vid)
+            except Exception:
+                pass
+            self._clone_voices.pop(ref, None)
 
     def cleanup(self):
         if not self._initialised:
