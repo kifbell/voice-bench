@@ -109,6 +109,22 @@ PROVIDERS: dict[str, ProviderSpec] = {
         needs_reference_text=False,
         has_clone_voice_slot=False,
     ),
+    "typecast": ProviderSpec(
+        name="typecast",
+        default_voice_id="",
+        default_model_id="typecast-tts",
+        needs_api_key="TYPECAST_API_KEY",
+        needs_reference_text=False,
+        has_clone_voice_slot=True,
+    ),
+    "resemble": ProviderSpec(
+        name="resemble",
+        default_voice_id="",
+        default_model_id="resemble-v2",
+        needs_api_key="RESEMBLE_API_KEY",
+        needs_reference_text=False,
+        has_clone_voice_slot=True,
+    ),
 }
 
 
@@ -172,6 +188,16 @@ def _build_provider(spec: ProviderSpec, manifest: dict, api_key: str | None):
         if api_key is None:
             raise RuntimeError("OPENAI_API_KEY missing")
         return OpenaiTtsProvider(api_key=api_key)
+    if spec.name == "typecast":
+        from voice_bench.providers.typecast import TypecastProvider
+        if api_key is None:
+            raise RuntimeError("TYPECAST_API_KEY missing")
+        return TypecastProvider(api_key=api_key)
+    if spec.name == "resemble":
+        from voice_bench.providers.resemble import ResembleProvider
+        if api_key is None:
+            raise RuntimeError("RESEMBLE_API_KEY missing")
+        return ResembleProvider(api_key=api_key)
     raise ValueError(f"Unknown provider: {spec.name}")
 
 
