@@ -17,9 +17,25 @@ from pathlib import Path
 _DEVICE = os.environ.get("VOICEBENCH_DEVICE", "cpu")
 
 
+_MODEL_ARGS_BASE = {
+    "mode": "predict_file",
+    "pretrained_model": None,  # filled in _model()
+    "deg": None,  # per-call
+    "data_dir": None,
+    "output_dir": None,
+    "csv_file": None,
+    "csv_deg": None,
+    "num_workers": 0,
+    "bs": 1,
+    "ms_channel": None,
+    "ms_sr": None,
+    "tr_bs_val": 1,
+    "tr_num_workers": 0,
+}
+
+
 @functools.lru_cache(maxsize=1)
 def _model():
-    import argparse
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
     from nisqa.NISQA_model import nisqaModel
@@ -28,34 +44,19 @@ def _model():
     weights_dir.mkdir(parents=True, exist_ok=True)
     weights = weights_dir / "nisqa.tar"
     if not weights.exists():
-        # The pip package ships an example weights download script, but the canonical
-        # location is the GitHub release. Fall back to urlretrieve.
         import urllib.request
         url = "https://github.com/gabrielmittag/NISQA/raw/master/weights/nisqa.tar"
         urllib.request.urlretrieve(url, str(weights))
 
-    args = argparse.Namespace(
-        mode="predict_file",
-        pretrained_model=str(weights),
-        deg=None,
-        data_dir=None,
-        output_dir=None,
-        csv_file=None,
-        csv_deg=None,
-        num_workers=0,
-        bs=1,
-        ms_channel=None,
-        ms_sr=None,
-        tr_bs_val=1,
-        tr_num_workers=0,
-    )
+    args = dict(_MODEL_ARGS_BASE)
+    args["pretrained_model"] = str(weights)
     return nisqaModel(args), args
 
 
 def score(wav_path: Path | str) -> dict:
-    """Return dict with mos_pred / noi_pred / col_pred / dis_pred / loud_pred (1-5)."""
+    """Return dict with nisqa_mos/noi/col/dis/loud (1-5)."""
     model, args = _model()
-    args.deg = str(wav_path)
+    args["deg"] = str(wav_path)
     df = model.predict()
     row = df.iloc[0]
     return {
