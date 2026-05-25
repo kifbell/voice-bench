@@ -1,136 +1,141 @@
-"""Compute speaker-similarity calibration anchors from GT (LibriTTS-R).
+"""Calibration anchors for speaker similarity metrics.
 
-For each speaker in the manifest, sample multiple utterance pairs; compute
-WavLM and ECAPA cosine. Aggregate:
-  - upper: same-speaker similarity (what 'perfect cloning' would approach)
-  - lower: cross-speaker similarity (chance level)
+Computes upper (same-speaker) and lower (different-speaker) bounds for WavLM
+and ECAPA-TDNN cosine similarity, using only GT LibriTTS-R WAV files from the
+manifest. This lets us interpret absolute cloning-task similarity scores:
 
-Writes results/calibration.json. Without these anchors, raw similarity
-numbers in metrics.parquet are uninterpretable.
+  cloning_sim ~ upper_p50  -> "indistinguishable from real speaker"
+  cloning_sim ~ lower_mean -> "random different person"
+
+Upper anchor (same-speaker):
+  Per speaker, compute similarity between reference WAV and N random target
+  WAVs from the same speaker in the manifest.
+
+Lower anchor (cross-speaker):
+  For all (speaker_A, speaker_B) pairs in the manifest, similarity between
+  their reference WAVs.
+
+Writes results/calibration_anchors.json with:
+  {
+    "wavlm": {"upper_p50": ..., "upper_p05": ..., "lower_mean": ..., "lower_p95": ...,
+              "upper_samples": [...], "lower_samples": [...]},
+    "ecapa": {...},
+  }
 """
 import argparse
 import json
-import random
+import os
 import sys
-import warnings
 from itertools import combinations
 from pathlib import Path
 
-warnings.filterwarnings("ignore")
-
 import numpy as np
-from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from voice_bench.dataset import load_manifest
-from voice_bench.metrics.audio_io import load_16k
-from voice_bench.metrics import wavlm_sim, ecapa_sim
-
-
-def _pct(values: list[float], p: float) -> float:
-    return float(np.percentile(values, p))
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", default="data/samples.json")
-    ap.add_argument("--out", default="results/calibration.json")
-    ap.add_argument("--same-pairs-per-speaker", type=int, default=10,
-                    help="Number of (utt_i, utt_j) pairs to sample within each speaker.")
-    ap.add_argument("--cross-pairs", type=int, default=200,
-                    help="Number of (speaker_a, speaker_b) cross-speaker pairs to sample.")
-    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--out", default="results/calibration_anchors.json")
+    ap.add_argument(
+        "--device",
+        default=os.environ.get("VOICEBENCH_DEVICE", "cpu"),
+        help="Computation device for the encoders.",
+    )
+    ap.add_argument(
+        "--targets-per-speaker",
+        type=int,
+        default=5,
+        help="How many target WAVs to compare against reference per speaker.",
+    )
     args = ap.parse_args()
 
-    rng = random.Random(args.seed)
+    os.environ["VOICEBENCH_DEVICE"] = args.device
+
     root = Path(__file__).resolve().parent.parent
-    manifest = load_manifest(root / args.manifest)
-    out_path = root / args.out
+    manifest = json.loads((root / args.manifest).read_text())
+    speakers = manifest["speakers"]
 
-    # Build per-speaker list of utterance WAV paths (reference + targets).
-    per_speaker: dict[str, list[Path]] = {}
-    for spk in manifest["speakers"]:
-        utts = [Path(spk["reference"]["wav_path"])] + [Path(t["wav_path"]) for t in spk["targets"]]
-        per_speaker[spk["speaker_id"]] = utts
+    from voice_bench.metrics import wavlm_sim, ecapa_sim
+    from voice_bench.metrics.audio_io import load_16k
 
-    # Pre-embed everything we'll need. Each speaker contributes ≤ same_pairs*2 utterances
-    # for the within-speaker anchor, plus one utterance reused for cross-speaker.
-    # In practice we embed every utterance we touch and cache by path.
-    cache_w: dict[Path, np.ndarray] = {}
-    cache_e: dict[Path, np.ndarray] = {}
+    cache_wavlm: dict[str, np.ndarray] = {}
+    cache_ecapa: dict[str, np.ndarray] = {}
 
-    def emb(path: Path) -> tuple[np.ndarray, np.ndarray]:
-        if path not in cache_w:
-            audio = load_16k(path)
-            cache_w[path] = wavlm_sim.embed(audio)
-            cache_e[path] = ecapa_sim.embed(audio)
-        return cache_w[path], cache_e[path]
+    def embed(wav_path: str) -> tuple[np.ndarray, np.ndarray]:
+        if wav_path in cache_wavlm:
+            return cache_wavlm[wav_path], cache_ecapa[wav_path]
+        audio = load_16k(wav_path)
+        w = wavlm_sim.embed(audio)
+        e = ecapa_sim.embed(audio)
+        cache_wavlm[wav_path] = w
+        cache_ecapa[wav_path] = e
+        return w, e
 
-    # ---- Upper anchor: same-speaker pairs ----
-    same_wavlm, same_ecapa = [], []
-    print(f"Same-speaker pairs ({args.same_pairs_per_speaker} per speaker × {len(per_speaker)} speakers):")
-    for spk_id, utts in tqdm(per_speaker.items()):
-        all_pairs = list(combinations(range(len(utts)), 2))
-        rng.shuffle(all_pairs)
-        for i, j in all_pairs[: args.same_pairs_per_speaker]:
-            w_i, e_i = emb(utts[i])
-            w_j, e_j = emb(utts[j])
-            same_wavlm.append(wavlm_sim.cosine(w_i, w_j))
-            same_ecapa.append(ecapa_sim.cosine(e_i, e_j))
+    upper_wavlm: list[float] = []
+    upper_ecapa: list[float] = []
+    print(f"Computing upper bound (same-speaker) across {len(speakers)} speakers ...")
+    for spk in speakers:
+        ref = spk["reference"]["wav_path"]
+        ref_w, ref_e = embed(ref)
+        targets = spk["targets"][: args.targets_per_speaker]
+        for tgt in targets:
+            t_w, t_e = embed(tgt["wav_path"])
+            upper_wavlm.append(wavlm_sim.cosine(ref_w, t_w))
+            upper_ecapa.append(ecapa_sim.cosine(ref_e, t_e))
 
-    # ---- Lower anchor: cross-speaker pairs ----
-    cross_wavlm, cross_ecapa = [], []
-    speakers = list(per_speaker.keys())
-    print(f"\nCross-speaker pairs ({args.cross_pairs}):")
-    for _ in tqdm(range(args.cross_pairs)):
-        a, b = rng.sample(speakers, 2)
-        ua = rng.choice(per_speaker[a])
-        ub = rng.choice(per_speaker[b])
-        w_a, e_a = emb(ua)
-        w_b, e_b = emb(ub)
-        cross_wavlm.append(wavlm_sim.cosine(w_a, w_b))
-        cross_ecapa.append(ecapa_sim.cosine(e_a, e_b))
+    print(f"Computing lower bound (cross-speaker) across "
+          f"{len(speakers) * (len(speakers) - 1) // 2} speaker pairs ...")
+    lower_wavlm: list[float] = []
+    lower_ecapa: list[float] = []
+    for a, b in combinations(speakers, 2):
+        a_w, a_e = embed(a["reference"]["wav_path"])
+        b_w, b_e = embed(b["reference"]["wav_path"])
+        lower_wavlm.append(wavlm_sim.cosine(a_w, b_w))
+        lower_ecapa.append(ecapa_sim.cosine(a_e, b_e))
 
-    calibration = {
-        "manifest": str(out_path.parent / "..").replace("..", args.manifest),
-        "seed": args.seed,
-        "same_pairs_per_speaker": args.same_pairs_per_speaker,
-        "cross_pairs": args.cross_pairs,
-        "n_speakers": len(per_speaker),
-        "wavlm": {
-            "same_mean": float(np.mean(same_wavlm)),
-            "same_p05": _pct(same_wavlm, 5),
-            "same_p50": _pct(same_wavlm, 50),
-            "same_p95": _pct(same_wavlm, 95),
-            "cross_mean": float(np.mean(cross_wavlm)),
-            "cross_p05": _pct(cross_wavlm, 5),
-            "cross_p50": _pct(cross_wavlm, 50),
-            "cross_p95": _pct(cross_wavlm, 95),
-            "n_same": len(same_wavlm),
-            "n_cross": len(cross_wavlm),
-        },
-        "ecapa": {
-            "same_mean": float(np.mean(same_ecapa)),
-            "same_p05": _pct(same_ecapa, 5),
-            "same_p50": _pct(same_ecapa, 50),
-            "same_p95": _pct(same_ecapa, 95),
-            "cross_mean": float(np.mean(cross_ecapa)),
-            "cross_p05": _pct(cross_ecapa, 5),
-            "cross_p50": _pct(cross_ecapa, 50),
-            "cross_p95": _pct(cross_ecapa, 95),
-            "n_same": len(same_ecapa),
-            "n_cross": len(cross_ecapa),
-        },
+    def summarise(name: str, upper: list[float], lower: list[float]) -> dict:
+        u = np.asarray(upper)
+        l_ = np.asarray(lower)
+        return {
+            "metric": name,
+            "upper_n": int(u.size),
+            "upper_p50": float(np.percentile(u, 50)),
+            "upper_p05": float(np.percentile(u, 5)),
+            "upper_p95": float(np.percentile(u, 95)),
+            "upper_mean": float(u.mean()),
+            "upper_std": float(u.std(ddof=1)),
+            "lower_n": int(l_.size),
+            "lower_p50": float(np.percentile(l_, 50)),
+            "lower_p05": float(np.percentile(l_, 5)),
+            "lower_p95": float(np.percentile(l_, 95)),
+            "lower_mean": float(l_.mean()),
+            "lower_std": float(l_.std(ddof=1)),
+            "upper_samples": [round(x, 4) for x in upper],
+            "lower_samples": [round(x, 4) for x in lower],
+        }
+
+    result = {
+        "manifest_path": str(args.manifest),
+        "speakers": [s["speaker_id"] for s in speakers],
+        "n_speakers": len(speakers),
+        "targets_per_speaker": args.targets_per_speaker,
+        "device": args.device,
+        "wavlm": summarise("wavlm_sim", upper_wavlm, lower_wavlm),
+        "ecapa": summarise("ecapa_sim", upper_ecapa, upper_ecapa) if False else summarise("ecapa_sim", upper_ecapa, lower_ecapa),
     }
 
+    out_path = root / args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(calibration, indent=2))
-    print(f"\nWritten to {out_path}")
-    print(f"  WavLM  upper (same-speaker)   mean={calibration['wavlm']['same_mean']:.3f}  p05={calibration['wavlm']['same_p05']:.3f}")
-    print(f"  WavLM  lower (cross-speaker)  mean={calibration['wavlm']['cross_mean']:.3f}  p95={calibration['wavlm']['cross_p95']:.3f}")
-    print(f"  ECAPA  upper (same-speaker)   mean={calibration['ecapa']['same_mean']:.3f}  p05={calibration['ecapa']['same_p05']:.3f}")
-    print(f"  ECAPA  lower (cross-speaker)  mean={calibration['ecapa']['cross_mean']:.3f}  p95={calibration['ecapa']['cross_p95']:.3f}")
+    out_path.write_text(json.dumps(result, indent=2))
+    print(f"\nSaved: {out_path}")
+    print("\nSummary:")
+    for m in ("wavlm", "ecapa"):
+        r = result[m]
+        print(f"  {r['metric']}: "
+              f"upper p50={r['upper_p50']:.3f} (p05={r['upper_p05']:.3f}), "
+              f"lower mean={r['lower_mean']:.3f} (p95={r['lower_p95']:.3f})")
     return 0
 
 
