@@ -24,3 +24,4 @@ seaborn>=0.13
 pyarrow>=15
 scikit-learn>=1.4
 tqdm>=4
+nisqa
