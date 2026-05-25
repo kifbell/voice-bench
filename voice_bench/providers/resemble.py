@@ -82,26 +82,11 @@ class ResembleProvider:
             self._default_voice_uuid = voices[0]["uuid"]
 
     def tts(self, text, voice_id="", model_id=DEFAULT_MODEL_ID, *, seed=None):
-        del seed
-        self._ensure()
-        vid = voice_id or self._default_voice_uuid
-        if not vid:
-            raise RuntimeError("Resemble: no default voice available; account has no ready voices")
-        wav, sr, elapsed = self._synthesize(voice_uuid=vid, text=text)
-        wav_24k = resample_to_canonical(wav, sr)
-        return GenerationResult(
-            audio_pcm=float_to_pcm16_bytes(wav_24k),
-            sample_rate=SAMPLE_RATE_CANONICAL,
-            channels=1,
-            sample_width=2,
-            latency_seconds=elapsed,
-            provider=self.name,
-            task="tts",
-            model_id=model_id,
-            voice_id=vid,
-            character_count=len(text),
-            seed=None,
-            reference_wav_path=None,
+        # Resemble is included in voice-bench ONLY for the cloning task; the TTS
+        # column is intentionally left empty (no default-voice generation).
+        raise NotImplementedError(
+            "ResembleProvider is voice-cloning only; --tasks tts is disabled. "
+            "Run with --tasks cloning."
         )
 
     def clone(self, text, reference_wav_path, model_id=DEFAULT_MODEL_ID, *, seed=None, reference_text=None):
