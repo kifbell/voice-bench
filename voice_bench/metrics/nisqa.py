@@ -34,12 +34,13 @@ _MODEL_ARGS_BASE = {
 }
 
 
-@functools.lru_cache(maxsize=1)
-def _model():
-    import warnings
-    warnings.filterwarnings("ignore", category=UserWarning)
-    from nisqa.NISQA_model import nisqaModel
+_WEIGHTS_CACHED: Path | None = None
 
+
+def _weights_path() -> Path:
+    global _WEIGHTS_CACHED
+    if _WEIGHTS_CACHED is not None:
+        return _WEIGHTS_CACHED
     weights_dir = Path(os.environ.get("NISQA_WEIGHTS_DIR", Path.home() / ".cache" / "nisqa"))
     weights_dir.mkdir(parents=True, exist_ok=True)
     weights = weights_dir / "nisqa.tar"
@@ -47,16 +48,25 @@ def _model():
         import urllib.request
         url = "https://github.com/gabrielmittag/NISQA/raw/master/weights/nisqa.tar"
         urllib.request.urlretrieve(url, str(weights))
-
-    args = dict(_MODEL_ARGS_BASE)
-    args["pretrained_model"] = str(weights)
-    return nisqaModel(args), args
+    _WEIGHTS_CACHED = weights
+    return weights
 
 
 def score(wav_path: Path | str) -> dict:
-    """Return dict with nisqa_mos/noi/col/dis/loud (1-5)."""
-    model, args = _model()
+    """Return dict with nisqa_mos/noi/col/dis/loud (1-5).
+
+    NISQA's nisqaModel loads the input dataset inside __init__, not on predict(),
+    so we cannot reuse a cached model instance across files -- have to construct
+    a fresh one per file. ~3-5 seconds overhead per call.
+    """
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning)
+    from nisqa.NISQA_model import nisqaModel
+
+    args = dict(_MODEL_ARGS_BASE)
+    args["pretrained_model"] = str(_weights_path())
     args["deg"] = str(wav_path)
+    model = nisqaModel(args)
     df = model.predict()
     row = df.iloc[0]
     return {
