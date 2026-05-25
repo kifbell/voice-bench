@@ -85,12 +85,21 @@ class ResembleProvider:
         ref_path = Path(reference_wav_path)
         clone_uuid = self._clone_voices.get(str(ref_path))
         if not clone_uuid:
-            # Slot recycling: Flex plan has only 1-2 voice clone slots. Delete
-            # any previously-cached voices for OTHER references before creating
-            # the new one. The currently-active one (for this reference) is
-            # cached above and re-used across multiple targets.
             self._recycle_other_slots(keep_ref=str(ref_path))
-            clone_uuid = self._create_rapid_clone(ref_path)
+            # Retry rapid-clone build up to 3 times -- Resemble's build flips to
+            # Failed for transient reasons (tmpfiles 503, brief processing glitches).
+            last_err = None
+            for attempt in range(3):
+                try:
+                    clone_uuid = self._create_rapid_clone(ref_path)
+                    break
+                except RuntimeError as e:
+                    last_err = e
+                    if "build failed" not in str(e):
+                        raise
+                    time.sleep(3)
+            else:
+                raise last_err
             self._clone_voices[str(ref_path)] = clone_uuid
 
         wav, sr, elapsed = self._synthesize(voice_uuid=clone_uuid, text=text)
