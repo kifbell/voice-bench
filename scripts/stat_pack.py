@@ -237,19 +237,24 @@ def stat_pack(parquet_path: Path, calib_path: Path, ratecards_path: Path | None)
                     oo_gaps.append(gap)
                 else:
                     co_gaps.append(gap)
-            if len(cc_gaps) >= 3 and len(co_gaps) >= 3:
+            within = cc_gaps + oo_gaps
+            if len(within) >= 3 and len(co_gaps) >= 3:
                 try:
-                    stat, pval = mannwhitneyu(cc_gaps, co_gaps, alternative="less")
+                    # H3: within-camp gaps (CC ∪ OO) are systematically SMALLER
+                    # than between-camp (CO) gaps.
+                    stat, pval = mannwhitneyu(co_gaps, within, alternative="greater")
                     h3[task][m] = {
                         "stat": float(stat),
                         "p_value": float(pval),
-                        "alternative": "cc_gap_less_than_co_gap",
-                        "cc_gaps_mean": float(np.mean(cc_gaps)),
+                        "alternative": "co_gap_greater_than_within_camp",
+                        "cc_gaps_mean": float(np.mean(cc_gaps)) if cc_gaps else None,
                         "co_gaps_mean": float(np.mean(co_gaps)),
                         "oo_gaps_mean": float(np.mean(oo_gaps)) if oo_gaps else None,
+                        "within_gaps_mean": float(np.mean(within)),
                         "n_cc_pairs": len(cc_gaps),
                         "n_co_pairs": len(co_gaps),
                         "n_oo_pairs": len(oo_gaps),
+                        "n_within_pairs": len(within),
                     }
                 except Exception as e:
                     h3[task][m] = {"error": str(e)[:100]}

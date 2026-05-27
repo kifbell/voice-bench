@@ -197,12 +197,12 @@ def gen_hypotheses(stats, out_path):
     content = f"""% Auto-generated. Do not edit.
 \\begin{{table}}[ht]
 \\centering
-\\caption{{Сводная таблица проверки гипотез. Колонка «Verdict» --- $\\checkmark$ = подтверждена, $\\times$ = не подтверждена.}}
+\\caption{{Сводная таблица проверки гипотез. Колонка «Итог» --- $\\checkmark$ = подтверждена, $\\times$ = не подтверждена.}}
 \\label{{tab:hypotheses}}
 \\resizebox{{\\textwidth}}{{!}}{{%
 \\begin{{tabular}}{{llllc}}
 \\toprule
-ID & Формулировка & Статистика & $p$-value & Verdict \\\\
+ID & Формулировка & Статистика & $p$-value & Итог \\\\
 \\midrule
 {body}
 \\bottomrule

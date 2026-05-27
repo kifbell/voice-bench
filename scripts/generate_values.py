@@ -56,14 +56,31 @@ def emit_commands(stats):
 
     hv = stats["hypotheses_verdict"]
 
+    PROV_DISPLAY = {
+        "azure_tts": "Azure Neural",
+        "google_tts": "Google Neural2",
+        "openai_tts": "OpenAI tts-1",
+        "elevenlabs": "ElevenLabs",
+        "typecast": "Typecast",
+        "resemble": "Resemble",
+        "xtts_v2": "XTTSv2",
+        "f5_tts": "F5-TTS",
+        "cosyvoice2": "CosyVoice2",
+        "fish_speech_s1": "Fish-Speech~S1",
+        "fish_speech_s2_pro": "Fish-Speech~S2~Pro",
+    }
+
+    def _pretty(provs):
+        return ", ".join(PROV_DISPLAY.get(p, p.replace("_", "\\_")) for p in provs)
+
     h1 = hv["h1_no_dominant_provider"]
     yield "valHOneTtsFrontierSize", str(h1["h1.tts"]["n_on_frontier"])
     yield "valHOneTtsFrontierTotal", str(h1["h1.tts"]["n_total"])
-    yield "valHOneTtsFrontierMembers", ", ".join(h1["h1.tts"]["providers_on_frontier"]).replace("_", "\\_")
+    yield "valHOneTtsFrontierMembers", _pretty(h1["h1.tts"]["providers_on_frontier"])
     yield "valHOneTtsVerdict", _bool(h1["h1.tts"]["supports"])
     yield "valHOneCloningFrontierSize", str(h1["h1.cloning"]["n_on_frontier"])
     yield "valHOneCloningFrontierTotal", str(h1["h1.cloning"]["n_total"])
-    yield "valHOneCloningFrontierMembers", ", ".join(h1["h1.cloning"]["providers_on_frontier"]).replace("_", "\\_")
+    yield "valHOneCloningFrontierMembers", _pretty(h1["h1.cloning"]["providers_on_frontier"])
     yield "valHOneCloningVerdict", _bool(h1["h1.cloning"]["supports"])
 
     h2nat = hv["h2_naturalness_agreement"]
