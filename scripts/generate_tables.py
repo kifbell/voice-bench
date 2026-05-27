@@ -34,6 +34,10 @@ PROVIDER_DISPLAY = {
 
 COMMERCIAL = {"azure_tts", "google_tts", "openai_tts", "elevenlabs", "typecast", "resemble"}
 
+# Providers whose "cloning" endpoint outputs a fixed default voice and ignores
+# the reference -- excluded from cloning-task analytics globally.
+FAKE_CLONING_PROVIDERS = {"azure_tts", "google_tts", "openai_tts"}
+
 METRIC_DISPLAY = {
     "utmos": "UTMOSv2",
     "nisqa_mos": "NISQA",
@@ -262,6 +266,10 @@ def gen_sample_sizes(parquet_path, out_path):
             sub = df[(df["provider"] == prov) & (df["task"] == task)]
             if sub.empty:
                 continue
+            if task == "cloning" and prov in FAKE_CLONING_PROVIDERS:
+                # Fake-cloning providers: their cloning rows are excluded from
+                # all analytics; drop them from the sample-sizes table too.
+                continue
             row = [disp(prov), task.upper(), str(len(sub))]
             for m in metrics:
                 if m in sub.columns:
@@ -277,7 +285,7 @@ def gen_sample_sizes(parquet_path, out_path):
     content = f"""% Auto-generated. Do not edit.
 \\begin{{table}}[ht]
 \\centering
-\\caption{{Размеры выборок: количество файлов с непустым значением каждой метрики, по (провайдер $\\times$ задача). Прочерк --- метрика неприменима или не была посчитана.}}
+\\caption{{Размеры выборок: количество файлов с непустым значением каждой метрики, по (провайдер $\\times$ задача). Прочерк --- метрика неприменима. Cloning-строки Azure / Google / OpenAI отсутствуют, поскольку эти провайдеры не имеют voice-cloning эндпоинта и не выполняли задачу клонирования голоса; их файлы исключены из всех cloning-аналитик.}}
 \\label{{tab:sample_sizes}}
 \\resizebox{{\\textwidth}}{{!}}{{%
 \\begin{{tabular}}{{llrrrrrr}}

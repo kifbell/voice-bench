@@ -230,7 +230,12 @@ def fig_pareto_cloning(df: pd.DataFrame, out: Path, full_dim_optimal: set | None
 
 
 def fig_correlation_heatmap(df: pd.DataFrame, out: Path):
-    """Spearman correlation between metrics at utterance-level."""
+    """Spearman correlation between metrics at utterance-level.
+
+    Excludes the cloning rows of fake-cloning providers (Azure/Google/OpenAI),
+    matching the analysed-rows convention used by stat_pack."""
+    fake_mask = (df['task'] == 'cloning') & (df['provider'].isin(FAKE_CLONING_PROVIDERS))
+    df = df[~fake_mask]
     sub = df[list(ALL_METRICS)].dropna(how="all")
     corr = np.full((len(ALL_METRICS), len(ALL_METRICS)), np.nan)
     for i, m1 in enumerate(ALL_METRICS):
@@ -265,7 +270,11 @@ def fig_correlation_heatmap(df: pd.DataFrame, out: Path):
 
 
 def fig_ranking_table(df: pd.DataFrame, out: Path):
-    """Provider ranking table (mean per metric, separately for tts and cloning)."""
+    """Provider ranking table (mean per metric, separately for tts and cloning).
+
+    Drops cloning rows of fake-cloning providers."""
+    fake_mask = (df["task"] == "cloning") & (df["provider"].isin(FAKE_CLONING_PROVIDERS))
+    df = df[~fake_mask]
     fig, axes = plt.subplots(2, 3, figsize=(15, 9))
     panel_metrics = [
         ("utmos", "UTMOSv2 (1-5, higher better)"),
@@ -350,11 +359,17 @@ def fig_calibration_plot(df: pd.DataFrame, calib: dict, out: Path):
 
 
 def fig_gap_distribution(df: pd.DataFrame, out: Path):
-    """CC vs CO vs OO pair-gap distributions for UTMOS / NISQA / WER on each task."""
+    """CC vs CO vs OO pair-gap distributions for UTMOS / NISQA / WER on each task.
+
+    For the cloning task we exclude fake-cloning providers (Azure/Google/OpenAI)
+    -- they did not perform the task and shouldn't enter pair-gap statistics."""
     fig, axes = plt.subplots(2, 3, figsize=(15, 8))
     panel_metrics = ("utmos", "nisqa_mos", "whisper_wer")
     for row_idx, task in enumerate(("tts", "cloning")):
-        sys_means = df[df["task"] == task].groupby("provider")[list(panel_metrics)].mean()
+        task_df = df[df["task"] == task]
+        if task == "cloning":
+            task_df = task_df[~task_df["provider"].isin(FAKE_CLONING_PROVIDERS)]
+        sys_means = task_df.groupby("provider")[list(panel_metrics)].mean()
         providers = list(sys_means.index)
         for col_idx, m in enumerate(panel_metrics):
             ax = axes[row_idx, col_idx]
@@ -382,8 +397,10 @@ def fig_gap_distribution(df: pd.DataFrame, out: Path):
 
 
 def fig_utterance_jitter(df: pd.DataFrame, out: Path):
-    """Per-utterance UTMOS scatter for first few provider pairs to visualise variance."""
-    sub = df[df["task"] == "cloning"]
+    """Per-utterance UTMOS scatter for first few provider pairs to visualise variance.
+
+    Cloning task: excludes fake-cloning providers."""
+    sub = df[(df["task"] == "cloning") & (~df["provider"].isin(FAKE_CLONING_PROVIDERS))]
     pivot = sub.pivot_table(index="utt_id", columns="provider", values="utmos", aggfunc="first")
     providers = list(pivot.columns)
     pairs = list(combinations(providers, 2))[:6]  # show 6 pairs
