@@ -1,0 +1,14 @@
+% Auto-generated. Do not edit.
+\begin{table}[ht]
+\centering
+\caption{Калибровочные якоря для метрик speaker similarity. «Same-speaker» --- cosine similarity между двумя независимыми утверждениями одного диктора (верхняя граница). «Cross-speaker» --- схожесть между разными дикторами (нижняя граница).}
+\label{tab:calibration}
+\begin{tabular}{lrrrrr}
+\toprule
+Метрика & Same-speaker $p_{50}$ & Same-speaker mean $\pm$ std & $N_{up}$ & Cross-speaker mean $\pm$ std & $N_{lo}$ \\
+\midrule
+WAVLM & 0.958 & 0.946 $\pm$ 0.051 & 100 & 0.686 $\pm$ 0.170 & 190 \\
+ECAPA & 0.703 & 0.676 $\pm$ 0.153 & 100 & 0.223 $\pm$ 0.118 & 190 \\
+\bottomrule
+\end{tabular}
+\end{table}

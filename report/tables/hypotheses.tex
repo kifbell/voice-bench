@@ -1,0 +1,27 @@
+% Auto-generated. Do not edit.
+\begin{table}[ht]
+\centering
+\caption{Сводная таблица проверки гипотез. Колонка «Verdict» --- $\checkmark$ = подтверждена, $\times$ = не подтверждена.}
+\label{tab:hypotheses}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llllc}
+\toprule
+ID & Формулировка & Статистика & $p$-value & Verdict \\
+\midrule
+H1.tts & Pareto frontier (TTS) >1 провайдера & 6/9 на Pareto & -- & \checkmark \\
+H1.cloning & Pareto frontier (Cloning) >1 провайдера & 7/8 на Pareto & -- & \checkmark \\
+H2.tts.nat & UTMOSv2 и NISQA согласуются (TTS), $\rho \geq 0.7$ & $\rho = 0.500$ & 0.170 & $\times$ \\
+H2.cloning.nat & UTMOSv2 и NISQA согласуются (Cloning), $\rho \geq 0.7$ & $\rho = -0.190$ & 0.651 & $\times$ \\
+H2.cloning.sim & WavLM и ECAPA расходятся (Cloning), $\rho < 0.7$ & $\rho = 0.976$ & $< 0.001$ & $\times$ \\
+h3.tts.utmos & CO-разрыв $>$ CC,OO & CC=0.092, CO=0.240, OO=0.252 & $< 0.001$ & \checkmark \\
+h3.tts.nisqa\_mos & CO-разрыв $>$ CC,OO & CC=0.134, CO=0.374, OO=0.356 & 0.008 & \checkmark \\
+h3.tts.whisper\_wer & CO-разрыв $>$ CC,OO & CC=0.000, CO=0.003, OO=0.003 & $< 0.001$ & \checkmark \\
+h3.cloning.utmos & CO-разрыв $>$ CC,OO & CC=0.315, CO=0.207, OO=0.219 & 0.849 & $\times$ \\
+h3.cloning.nisqa\_mos & CO-разрыв $>$ CC,OO & CC=0.127, CO=0.134, OO=0.146 & 0.588 & $\times$ \\
+h3.cloning.whisper\_wer & CO-разрыв $>$ CC,OO & CC=0.001, CO=0.006, OO=0.003 & 0.009 & \checkmark \\
+h3.cloning.wavlm\_sim & CO-разрыв $>$ CC,OO & CC=0.009, CO=0.015, OO=0.009 & 0.249 & $\times$ \\
+h3.cloning.ecapa\_sim & CO-разрыв $>$ CC,OO & CC=0.064, CO=0.077, OO=0.057 & 0.500 & $\times$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

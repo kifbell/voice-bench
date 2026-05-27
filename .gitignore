@@ -41,3 +41,11 @@ data/*
 *.ogg
 *.mp3
 *.wav
+
+# LaTeX build artifacts (keep .tex and .pdf, ignore everything else)
+report/*.aux
+report/*.toc
+report/*.fls
+report/*.fdb_latexmk
+report/*.out
+report/*.synctex.gz

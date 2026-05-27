@@ -1,0 +1,27 @@
+% Auto-generated. Do not edit.
+\begin{table}[ht]
+\centering
+\caption{Sensitivity-анализ Парето-фронта: размер и состав фронта в зависимости от выбора измеренных осей. Первая строка для каждой задачи (выделена) --- основная проекция, по которой формулируется verdict H1. Последующие строки --- альтернативные проекции с удалением части осей; они показывают, как нетривиальность фронта зависит от количества измеряемых характеристик качества.}
+\label{tab:pareto}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllp{6cm}}
+\toprule
+Задача & Оси проекции & На фронте / всего & Парето-оптимальные \\
+\midrule
+\textbf{TTS} & \textbf{UTMOSv2, NISQA, WER, Cost (USD)} & \textbf{6/9} & \textbf{Azure Neural, CosyVoice2, F5-TTS, Google Neural2, OpenAI tts-1, XTTSv2} \\
+TTS & UTMOSv2, WER, Cost (USD) & 4/9 & Azure Neural, CosyVoice2, Google Neural2, OpenAI tts-1 \\
+TTS & UTMOSv2, NISQA, Cost (USD) & 5/9 & Azure Neural, CosyVoice2, F5-TTS, Google Neural2, OpenAI tts-1 \\
+TTS & UTMOSv2, WER & 3/9 & Azure Neural, CosyVoice2, Google Neural2 \\
+TTS & UTMOSv2, Cost (USD) & 1/9 & CosyVoice2 \\
+TTS & WER, Cost (USD) & 3/9 & CosyVoice2, Google Neural2, OpenAI tts-1 \\
+\textbf{CLONING} & \textbf{UTMOSv2, NISQA, WavLM, WER, Cost (USD)} & \textbf{7/8} & \textbf{CosyVoice2, ElevenLabs, F5-TTS, Fish-Speech S1, Fish-Speech S2 Pro, Resemble, Typecast} \\
+CLONING & UTMOSv2, WavLM, Cost (USD) & 1/8 & CosyVoice2 \\
+CLONING & UTMOSv2, WavLM, WER, Cost (USD) & 6/8 & CosyVoice2, ElevenLabs, Fish-Speech S1, Fish-Speech S2 Pro, Resemble, Typecast \\
+CLONING & UTMOSv2, NISQA, WavLM, Cost (USD) & 6/8 & CosyVoice2, ElevenLabs, F5-TTS, Fish-Speech S1, Fish-Speech S2 Pro, Resemble \\
+CLONING & UTMOSv2, WavLM, Скорость (с) & 5/8 & CosyVoice2, ElevenLabs, F5-TTS, Resemble, XTTSv2 \\
+CLONING & UTMOSv2, Cost (USD) & 1/8 & CosyVoice2 \\
+CLONING & WavLM, Cost (USD) & 1/8 & CosyVoice2 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

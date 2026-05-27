@@ -1,0 +1,392 @@
+\documentclass[12pt,a4paper]{article}
+
+% --- Language and encoding ---
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian,english]{babel}
+
+% --- Page geometry ---
+\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=3cm,right=2cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% --- Math, tables, graphics ---
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+\usepackage{title_page}
+\usepackage{enumitem}
+\usepackage[protrusion=true,expansion=false]{microtype}
+\usepackage[subsection,below]{placeins}  % \FloatBarrier at every \subsection
+% Allow slightly looser spacing to avoid Overfull hbox warnings
+\sloppy
+\emergencystretch=3em
+
+% --- Auto-generated dynamic values ---
+\input{values.tex}
+
+% --- Figure path ---
+\graphicspath{{figures/}}
+
+\begin{document}
+
+\setTitle{Сравнительный бенчмарк коммерческих и open-source систем синтеза речи и клонирования голоса на основе автоматических метрик качества}
+\setStudent{Беляков Кирилл}
+\setGroup{ЭАД2026}
+\setStudentDate{\today}
+\setAdvisor{}
+\setAdvisorTitle{}
+\setAdvisorAffiliation{}
+\setAdvisorDate{}
+\setYear{2026}
+\makeTitlePage
+
+\begin{abstract}
+\noindent
+Современный рынок систем синтеза речи (Text-to-Speech, TTS) и клонирования голоса (voice cloning) стремительно растёт, однако выбор провайдера для конкретной прикладной задачи затруднён отсутствием воспроизводимых сравнительных оценок. Существующие лидерборды либо ограничиваются одной метрикой (UTMOSv2 на TTS Arena), либо опираются на закрытые внутренние данные провайдеров. В настоящей работе представлен открытый бенчмарк \valNProviders{} \textbf{готовых систем синтеза в режиме inference} (6 коммерческих API и 5 open-source моделей), оценённых на \valNRowsTotal{} аудиозаписях, синтезированных по фиксированному набору текстов и опорных дикторов из публичного датасета LibriTTS-R. Сравнение проводится по пяти автоматическим метрикам качества (UTMOSv2, NISQA, Whisper-WER, WavLM speaker similarity, ECAPA-TDNN speaker similarity), а также по стоимости и скорости генерации. Проверяются три гипотезы: об отсутствии единственной парето-доминирующей модели в многомерном пространстве (качество, стоимость) (H1), о согласованности метрик одного типа (H2) и о разрыве между группами коммерческих и open-source систем (H3). Результаты показывают, что в обеих задачах Парето-фронт нетривиален: для TTS он включает \valHOneTtsFrontierSize{} систем из \valHOneTtsFrontierTotal{}, для voice cloning --- \valHOneCloningFrontierSize{} из \valHOneCloningFrontierTotal{}. CosyVoice2 (open-source) присутствует на фронте в обеих задачах. Метрики качества звука (UTMOSv2 и NISQA) согласуются слабо ($\rho \leq 0.5$ при пороге гипотезы $\rho \geq 0.7$), тогда как метрики speaker similarity (WavLM и ECAPA) сильно скоррелированы ($\rho = \valHTwoCloningSimRho{}$), что обосновывает использование любой одной из них. Системный разрыв commercial vs OSS статистически значим для естественности TTS, но не для качества клонирования.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =========================================================================
+\section{Введение}
+
+\subsection{Контекст и постановка задачи}
+Качество синтетической речи за последние пять лет приблизилось к человеческому уровню для целого ряда языков и доменов. На рынке одновременно сосуществуют два класса систем: коммерческие облачные API (ElevenLabs, OpenAI TTS, Microsoft Azure Cognitive Services, Google Cloud Text-to-Speech, Typecast, Resemble AI) и open-source модели с публично доступными весами (Coqui XTTSv2, F5-TTS, Alibaba CosyVoice2, FishAudio Fish-Speech S1 и S2 Pro). При выборе системы для прикладной задачи разработчик сталкивается с тремя методологическими проблемами: (1)~субъективные MOS-оценки не воспроизводимы и существенно зависят от пула слушателей; (2)~публичные лидерборды (TTS Arena~\cite{ttsarena}) измеряют только одну ось качества, не учитывая стоимость и скорость генерации; (3)~опорный набор текстов и дикторов варьируется от исследования к исследованию, что делает прямое сравнение результатов невозможным.
+
+\subsection{Объекты сравнения}
+Настоящая работа представляет собой \textbf{бенчмарк-исследование} готовых систем синтеза в режиме inference; разработка собственных моделей или дообучение существующих весов выходят за рамки работы. Сравнению подлежат \valNProviders{} моделей, которые делятся на две выборки.
+
+Шесть \textbf{коммерческих облачных API} с закрытыми весами: ElevenLabs (модель Multilingual~v2 для TTS, Instant Voice Clone для cloning), OpenAI TTS (\texttt{tts-1}, голос \textit{alloy}), Microsoft Azure Cognitive Services (Neural Voice \texttt{en-US-AvaMultilingualNeural}), Google Cloud Text-to-Speech (\texttt{Neural2-F}), Typecast (модель SSFM-v30, поддерживает только voice cloning) и Resemble AI (Rapid Voice Clone, также cloning-only).
+
+Пять \textbf{open-source моделей} с публично доступными весами, инференс выполнялся на одной видеокарте NVIDIA RTX~4090: Coqui XTTSv2, F5-TTS~\cite{f5tts}, Alibaba CosyVoice2-0.5B~\cite{cosyvoice2}, FishAudio Fish-Speech S1-mini и Fish-Speech S2 Pro.
+
+Все модели запускались с параметрами по умолчанию из документации провайдера, без prompt-engineering и без тюнинга гиперпараметров. Такой подход моделирует поведение типичного разработчика, осуществляющего первичное знакомство с API. Сознательно не сравнивались разные тарифы одного провайдера (например, ElevenLabs Pro Voice Clone и Instant Voice Clone), а также проприетарные модели без публично доступного API.
+
+\subsection{Эмпирические данные}
+В качестве источника эталонных текстов и опорных записей использован открытый корпус LibriTTS-R~\cite{librittsr} в варианте \textit{test-clean}, лицензия CC~BY~4.0; собственный сбор речевых данных в работе не проводился. Корпус является общепризнанным стандартом для сравнения нейронных TTS-моделей (CosyVoice2, XTTSv2, F5-TTS публикуют результаты на нём) и состоит из чистой студийной читки 39 английских дикторов с применённой моделью DEMUCS для шумоподавления исходного LibriTTS.
+
+После фильтрации по доступной длительности референса (5--10~секунд) и целевых утверждений (30--300~символов) в \textit{test-clean} остаётся 34 пригодных диктора, из которых случайным образом отобраны \valNSpeakers{} с балансом по полу (10 мужчин и 10 женщин); для каждого диктора --- по 20 текстовых утверждений. Эксперимент покрывает обе задачи синтеза:
+\begin{itemize}[noitemsep]
+    \item \textbf{Text-to-Speech} (фиксированный голос провайдера) --- 9 моделей дают по 400 файлов; Typecast и Resemble не поддерживают TTS-режим.
+    \item \textbf{Voice cloning} (zero-shot, опорная запись длительностью 5--10~секунд из того же диктора, не входящая в целевые 20 утверждений) --- все 11 моделей; у Resemble AI выборка сокращена до 280 файлов из-за требований к минимальной длине референса.
+\end{itemize}
+Итоговый объём корпуса --- \valNRowsTotal{} синтезированных аудиозаписей. Из них \valNRowsAnalysed{} файлов попадают в статистические аналитики по cloning-задаче: 1200~файлов от Azure / Google / OpenAI исключены, поскольку эти провайдеры структурно не выполняют zero-shot voice cloning (см. Раздел~\ref{sec:methodology}).
+
+\subsection{Метрология оценки}
+В работе применяются исключительно \textbf{автоматические метрики} качества, без привлечения слушателей. Этот выбор продиктован четырьмя аргументами: (i)~воспроизводимость результатов между запусками и независимыми лабораториями, тогда как субъективные MOS-оценки варьируются на 0.2~балла и более между разными пулами слушателей~\cite{voicemos}; (ii)~масштаб эксперимента (\valNRowsTotal{} файлов), для которого получение хотя бы трёхкратного человеческого MOS требует более 24\,000 субъективных оценок; (iii)~наличие в сообществе устоявшегося прокси --- UTMOSv2~\cite{utmos}, демонстрирующего корреляцию $r \geq 0.94$ с реальным MOS на тест-сплитах VoiceMOS~Challenge~\cite{voicemos}; (iv)~публикация исходных аудиозаписей в открытом доступе позволяет любой третьей стороне применить свои собственные слушательские или автоматические метрики поверх наших данных.
+
+Оценка проводится по пяти метрикам: UTMOSv2 и NISQA~\cite{nisqa} для естественности; Whisper-WER (faster-whisper \textit{medium}, int8 на CPU, с базовой нормализацией текста через \texttt{jiwer}: нижний регистр, удаление пунктуации, схлопывание пробелов) для разборчивости; WavLM~\cite{wavlm} (\texttt{microsoft/wavlm-base-plus-sv} с x-vector головой) и ECAPA-TDNN~\cite{ecapa} (\texttt{speechbrain/spkrec-ecapa-voxceleb}) для схожести с диктором в задаче voice cloning. Параллельно фиксируются стоимость одной генерации (USD/файл, по официальным ratecards провайдеров) и скорость генерации (стенное время от запроса до получения полного аудиобуфера). Для интерпретации абсолютных значений speaker similarity дополнительно вычислены калибровочные якоря \textit{same-speaker} и \textit{cross-speaker} (Таблица~\ref{tab:calibration}).
+
+\subsection{Пробел в литературе}
+\label{ssec:gap}
+Краткий обзор: в существующей литературе не обнаружено работ, удовлетворяющих одновременно трём условиям --- (а)~совместное сравнение коммерческих API и open-source моделей в одном эксперименте, (б)~учёт стоимости и скорости генерации как самостоятельных осей, (в)~публичная доступность как численных результатов, так и самих синтезированных аудио. Подробное обоснование с разбором конкретных предшественников приведено в Разделе~\ref{ssec:related-work}; настоящая работа закрывает указанный пробел.
+
+\subsection{Цель и вопрос работы}
+\label{ssec:objective}
+\textbf{Основной исследовательский вопрос:} \textit{какие из современных систем синтеза речи и клонирования голоса составляют Парето-оптимальное множество в пространстве (естественность, разборчивость, схожесть с диктором, стоимость, скорость генерации) на корпусе LibriTTS-R test-clean (английская студийная речь), и существует ли статистически значимый разрыв качества между группой коммерческих и группой open-source решений?}
+
+Этот вопрос декомпозируется в три формальные гипотезы, проверяемые в Разделе~\ref{sec:hypotheses}:
+\begin{itemize}[noitemsep]
+    \item \textbf{H1} (Парето-оптимальность моделей). Не существует модели, парето-доминирующей над всеми остальными в многомерном пространстве оценок: для TTS --- (UTMOSv2, NISQA, Whisper-WER, стоимость); для voice cloning --- (UTMOSv2, NISQA, WavLM-similarity, Whisper-WER, стоимость).
+    \item \textbf{H2} (Согласованность метрик). Для естественности (UTMOSv2 vs NISQA) ожидается согласие систем-уровневых рангов ($\rho_{\text{Spearman}} \geq 0.7$), поскольку обе метрики номинально измеряют одно и то же свойство. Для speaker similarity (WavLM vs ECAPA) ожидается расхождение ($\rho < 0.7$), поскольку модели обучены на разных архитектурах и могут давать разный сигнал. Подтверждение каждой из двух подгипотез означало бы возможность ограничиться одной метрикой в соответствующем семействе.
+    \item \textbf{H3} (Разрыв между лагерями). Попарные различия системных средних между коммерческой и open-source моделью (CO-пары) статистически значимо больше, чем различия внутри каждого лагеря (CC- и OO-пары).
+\end{itemize}
+
+\medskip
+\noindent\textbf{Цель работы.} Построить воспроизводимый бенчмарк современных TTS- и voice-cloning-систем на едином корпусе и едином наборе метрик, формализовать сравнительные гипотезы и проверить их статистически. Все артефакты (синтезированные аудиозаписи, метрики, скрипты) выложены публично; повторение эксперимента занимает порядка двух суток на одной видеокарте NVIDIA RTX~4090.
+
+\medskip
+\noindent\textbf{Вклад работы.}
+\begin{itemize}
+    \item Собран открытый бенчмарк из \valNRowsTotal{} аудиозаписей (\valNProviders{} моделей $\times$ 2 задачи $\times$ \valNSpeakers{} дикторов из LibriTTS-R) с фиксированным манифестом текстов и опорных записей.
+    \item Реализован унифицированный pipeline, объединяющий пять автоматических метрик качества и измерения скорости генерации и стоимости, что устраняет вариативность методологии между провайдерами.
+    \item Сформулированы и статистически проверены три гипотезы: о Парето-оптимальности (H1), согласованности метрик (H2) и разрыве commercial-vs-OSS (H3).
+    % \item Публично выложены сами синтезированные аудиозаписи, что позволяет независимым исследователям пересчитать наши метрики или применить альтернативные, в том числе человеческие.
+\end{itemize}
+
+% =========================================================================
+\section{Обзор литературы и автоматические метрики}
+
+\subsection{Родственные работы и пробел в литературе}
+\label{ssec:related-work}
+Сравнительные исследования качества TTS-систем в основном принимают одну из трёх форм. Первая --- открытые лидерборды на основе слушательских оценок: TTS~Arena~\cite{ttsarena} ранжирует системы по ELO-rating от случайных слушателей в чате-интерфейсе на платформе Hugging Face и репортит UTMOSv2 как вторичную метрику. К ограничениям относятся непрозрачность исходного набора текстов, отсутствие задачи voice cloning, неучёт стоимостной оси и зависимость рейтингов от ежедневно меняющегося пула. Вторая форма --- бенчмарки на статичных корпусах в академических статьях, сопровождающих релизы конкретных моделей. Работа о CosyVoice2~\cite{cosyvoice2} сравнивает предлагаемую модель с XTTSv2 и собственными предшественниками на LibriTTS-R и SEED~corpus, рапортуя метрики SECS (speaker embedding cosine similarity) и WER. Аналогично, XTTSv2~\cite{xttsv2} и F5-TTS~\cite{f5tts} проводят сравнения исключительно в open-source выборке, фокусируясь на мультиязычности или диффузионной архитектуре соответственно. Третья форма --- маркетинговые материалы коммерческих провайдеров, где сравнение проводится с собственной выборкой и собственным набором метрик, что исключает независимую верификацию.
+
+Отдельную линию работ образуют исследования самих метрик качества. VoiceMOS~Challenge 2022 и 2024~\cite{voicemos} организовали конкурсы по предсказанию MOS, в результате чего были предложены модели UTMOSv2, MOSnet, NORESQA-MOS; на тестовом сплите VoiceMOS~Challenge UTMOSv2 демонстрирует корреляцию Пирсона $r \geq 0.94$ с агрегированными человеческими оценками. NISQA~\cite{nisqa} разрабатывалась изначально для оценки телефонной речи, но применима и к синтезу. SOMOS~\cite{somos} --- крупнейший публичный датасет MOS-аннотаций для современного нейронного TTS, использовался при тренировке UTMOSv2.
+
+В существующей литературе не обнаружено работ, удовлетворяющих одновременно трём условиям: (а)~совместное сравнение коммерческих API и open-source моделей в едином эксперименте; (б)~явный учёт стоимости и скорости генерации как самостоятельных осей; (в)~публичная доступность как численных результатов, так и самих синтезированных аудиозаписей для независимой переоценки. Настоящая работа закрывает указанный пробел.
+
+\subsection{Корпуса для оценки TTS}
+LibriTTS~\cite{libritts} --- стандартный корпус для исследований нейронного TTS, содержащий 585~часов английской речи 2456 дикторов; разделён на чистые и шумные части, сопровождается тщательной нормализацией текстов. LibriTTS-R~\cite{librittsr} --- его улучшенная версия с применённой моделью DEMUCS для шумоподавления. Подвыборка \textit{test-clean} содержит 39~дикторов и широко используется как тестовый сплит в работах по few-shot voice cloning.
+
+\subsection{UTMOSv2 как прокси MOS}
+UTMOSv2~\cite{utmos} --- модель предсказания Mean Opinion Score, обученная на корпусах MOS-аннотированных пар (\textit{stimulus, score}) с применением Self-Supervised Learning эмбеддингов WavLM. Достигает корреляции Пирсона $r \geq 0.94$ с реальным MOS на test-сплитах конкурсов VoiceMOS Challenge. В TTS Arena (Hugging Face) UTMOSv2 используется как единая ось ранжирования. Ограничения: значения сжаты в диапазон 3.2--4.0 для современных систем, выдаваемые «как есть» интерпретировать как MOS не следует.
+
+\subsection{NISQA}
+NISQA~\cite{nisqa} --- мульти-измеренческая модель оценки качества телефонной речи, выдаёт пять величин: общее MOS и четыре сабскора (Noisiness, Coloration, Discontinuity, Loudness). Предназначена изначально для оценки кодеков и каналов связи, но активно используется и для TTS. В наших экспериментах наблюдается насыщение шкалы NISQA для коммерческих TTS-провайдеров: значения упираются в верхнюю границу около 5.0.
+
+\subsection{Whisper-WER как метрика разборчивости}
+Word Error Rate $= (S+D+I)/N$, где $S,D,I,N$ --- количество замен, удалений, вставок и общее число слов в эталонной транскрипции, является стандартом для измерения разборчивости синтетической речи. В качестве ASR-системы выбран faster-whisper-\textit{medium} (соответствует выбору в открытом бенчмарке TTSDS, что упрощает сравнение результатов), запущенный в режиме int8 на CPU.
+
+\subsection{Speaker similarity}
+Cosine similarity speaker-эмбеддингов между опорной записью диктора и синтезированным аудио --- основная объективная метрика качества voice cloning. Используются две независимых модели:
+\begin{itemize}
+    \item \textbf{WavLM speaker embedding}~\cite{wavlm}: модель \texttt{microsoft/wavlm-base-plus-sv} (WavLM-Base+, дообученная на VoxCeleb для задачи speaker verification, выход --- x-vector). Калиброванный нами same-speaker $p_{50}$ составляет \valCalibWavlmUpperPFifty{}, cross-speaker mean --- \valCalibWavlmLowerMean{}.
+    \item \textbf{ECAPA-TDNN}~\cite{ecapa}: классический speaker recognition бэкбон с emphasized channel attention. Same-speaker $p_{50}=\valCalibEcapaUpperPFifty{}$, cross-speaker mean $= \valCalibEcapaLowerMean{}$ --- более широкий динамический диапазон, чем у WavLM.
+\end{itemize}
+Калибровочные якоря (Таблица~\ref{tab:calibration}) позволяют интерпретировать абсолютные значения схожести.
+
+\input{tables/calibration.tex}
+
+% =========================================================================
+\section{Методология}
+\label{sec:methodology}
+
+\subsection{Дизайн эксперимента}
+Эксперимент построен по факториальной схеме «провайдер $\times$ задача $\times$ диктор $\times$ утверждение». Из \textit{test-clean} LibriTTS-R случайно отобраны \valNSpeakers{} дикторов (10 мужчин + 10 женщин), сбалансированных по полу. Для каждого диктора выбраны 20 текстовых утверждений длиной 30--300 символов, что даёт 400 пар (диктор, текст) на (провайдер, задача). Для voice-cloning задачи в качестве reference берётся одна 5--10-секундная запись того же диктора, не входящая в целевые 20 утверждений.
+
+Каждая (провайдер, задача) комбинация даёт ровно 400 аудиозаписей, кроме исключений:
+\begin{itemize}
+    \item \textbf{Typecast} и \textbf{Resemble} были проверены только на задаче voice cloning (TTS-режим у этих провайдеров отсутствует).
+    \item У \textbf{Resemble} 6 дикторов из 20 имеют опорную запись короче 10 секунд, что нарушает требования rapid-clone эндпоинта; они исключены, итого 280 файлов в cloning-задаче.
+\end{itemize}
+Итоговый размер выборки: \valNRowsTotal{} строк (Таблица~\ref{tab:sample_sizes}).
+
+\input{tables/sample_sizes.tex}
+
+\subsection{Перечень моделей}
+Шесть коммерческих API: \textit{ElevenLabs} (Multilingual v2 + IVC clone), \textit{OpenAI TTS} (tts-1, voice = alloy), \textit{Azure Neural Speech} (en-US-AvaMultilingualNeural), \textit{Google Cloud TTS} (Neural2-F), \textit{Typecast} (SSFM-v30) и \textit{Resemble AI} (rapid clone). Пять open-source моделей: \textit{Coqui XTTSv2}, \textit{F5-TTS}, \textit{Alibaba CosyVoice2-0.5B}, \textit{FishAudio Fish-Speech S1-mini} и \textit{Fish-Speech S2 Pro}. Все open-source модели запускались на одном NVIDIA RTX~4090 (24~ГБ); веса кэшировались на NFS-хранилище между запусками.
+
+\textit{Замечание о cloning-задаче}. Azure~Neural Speech, Google~Cloud~TTS и OpenAI~tts-1 не имеют voice-cloning-эндпоинта: при обращении они синтезируют речь фиксированным голосом провайдера и игнорируют опорную запись диктора. Их строки в cloning-задаче технически генерируются (для возможности расчёта UTMOSv2, NISQA, WER, latency и cost), однако \textbf{исключаются из всех cloning-аналитик} (Парето-фронт, тесты H1.cloning, H2.cloning, H3.cloning), поскольку структурно эти провайдеры не выполняли оцениваемую задачу. Все verdicts по cloning формируются на 8 моделях: ElevenLabs, Typecast, Resemble, XTTSv2, F5-TTS, CosyVoice2, Fish-Speech~S1, Fish-Speech~S2~Pro.
+
+\subsection{Метрики}
+Каждая запись оценивается следующими автоматическими судьями:
+\begin{itemize}[noitemsep]
+    \item UTMOSv2 (\texttt{sarulab-speech/UTMOSv2}, версия 0.4) --- наследник UTMOS, инференс на CPU вследствие нестабильности GPU-пути на CUDA~13.
+    \item NISQA-MOS + 4 сабскора (модель Mittag, dnsmos-style).
+    \item Whisper-WER: faster-whisper \textit{medium} (вариант, использованный также в TTSDS-бенчмарках), int8 на CPU, расчёт через библиотеку \texttt{jiwer.Compose} с базовой нормализацией: \texttt{ToLowerCase + RemovePunctuation + RemoveMultipleSpaces + Strip + ReduceToListOfListOfWords}.
+    \item WavLM speaker embedding: \texttt{microsoft/wavlm-base-plus-sv} через \texttt{AutoModelForAudioXVector} (x-vector голова), исключительно на cloning-задаче.
+    \item ECAPA-TDNN cosine sim: \texttt{speechbrain/spkrec-ecapa-voxceleb}, аналогично.
+\end{itemize}
+Cost (USD) рассчитывается из официальных rate-card провайдеров (см. Таблицу~\ref{tab:costs}) умножением на число символов исходного текста. Latency измеряется как стенное время от вызова \texttt{POST} до получения полного аудиобуфера (для облачных API) или от вызова \texttt{model.generate()} до завершения декодирования (для локальных моделей).
+
+\subsection{Калибровка метрик speaker similarity}
+Абсолютные значения cosine similarity WavLM и ECAPA не имеют интуитивной шкалы. Для интерпретации мы вычисляем два якоря:
+\begin{itemize}[noitemsep]
+    \item \textbf{Верхний} (same-speaker): схожесть между двумя независимыми записями одного диктора. Усреднение по 100 случайным парам.
+    \item \textbf{Нижний} (cross-speaker): схожесть между записями разных дикторов. Усреднение по 190 случайным парам.
+\end{itemize}
+Используя медиану верхнего якоря, можно нормализовать наблюдаемые значения схожести и интерпретировать их как процент достижения «потолка» same-speaker.
+
+% =========================================================================
+\section{Гипотезы}
+\label{sec:hypotheses}
+
+\subsection{H1: отсутствие доминирующей модели}
+\textbf{Формулировка.} Не существует модели, парето-доминирующей над всеми остальными в многомерном пространстве «качество, стоимость» при дефолтных настройках inference.
+
+\textbf{Операционализация.} Для каждой задачи строится Парето-фронт в пространстве, включающем все измеренные оси качества плюс стоимость:
+\begin{itemize}[noitemsep]
+    \item TTS (4 оси): $(\text{UTMOSv2}, \text{NISQA}, \text{WER}, \text{cost\_usd})$, направления оптимизации: $\uparrow, \uparrow, \downarrow, \downarrow$.
+    \item Cloning (5 осей): $(\text{UTMOSv2}, \text{NISQA}, \text{WavLM-sim}, \text{WER}, \text{cost\_usd})$, направления: $\uparrow, \uparrow, \uparrow, \downarrow, \downarrow$.
+\end{itemize}
+Гипотеза подтверждается, если на фронте находятся $\geq 2$ моделей. Дополнительно проводится sensitivity-анализ: показывается, как размер фронта меняется при удалении/добавлении отдельных осей (см. Раздел~\ref{ssec:pareto-sensitivity}).
+
+\subsection{H2: согласованность метрик одного типа}
+\textbf{H2.naturalness.} UTMOSv2 и NISQA --- независимо обученные модели предсказания качества, поэтому их системные ранги должны коррелировать. Порог: $\rho_{\text{Spearman}} \geq 0.7$.
+
+\textbf{H2.similarity.} WavLM и ECAPA обучены на разных архитектурах (трансформер vs TDNN), поэтому могут расходиться. Гипотеза подтверждается, если $\rho_{\text{Spearman}} < 0.7$.
+
+\subsection{H3: разрыв между выборками}
+\textbf{Формулировка.} Системный разрыв между коммерческими и open-source провайдерами (CO-пары) больше, чем разрыв внутри каждой выборки (CC- и OO-пары).
+
+\textbf{Операционализация.} Для каждой пары провайдеров вычисляется абсолютная разность системных средних по метрике. Применяется односторонний Mann--Whitney $U$-тест: $H_0$ -- распределения $|gap|$ для CO-пар и (CC$\cup$OO)-пар совпадают; $H_1$ -- CO-пары систематически больше. Гипотеза подтверждается при $p < 0.05$.
+
+% =========================================================================
+\section{Результаты}
+\label{sec:results}
+
+\subsection{Сводные ранжирования}
+Таблицы~\ref{tab:ranking_tts} и~\ref{tab:ranking_cloning} показывают средние значения метрик с 95\%-ми бутстрап-доверительными интервалами (B = 10\,000 ресэмплов) для каждой комбинации (провайдер, задача).
+
+\input{tables/ranking_tts.tex}
+\input{tables/ranking_cloning.tex}
+
+\noindent В TTS-задаче по UTMOSv2 лидирует \valBestTtsUtmosProvider{} (\valBestTtsUtmosValue{}), что неожиданно, поскольку это open-source модель. Однако по NISQA лидеры --- \valBestTtsNisqaMosProvider{} и Azure/Google (значения 5.0+, упёрлись в потолок шкалы). Худший по UTMOSv2 в TTS --- \valWorstTtsUtmosProvider{} (\valWorstTtsUtmosValue{}). По WER все модели располагаются в коридоре 3.6--4.4\%, разница незначима с учётом ширины CI ($\sim$0.8 п.п.).
+
+\noindent В voice-cloning-задаче картина меняется радикально. \valBestCloningUtmosProvider{} лидирует по UTMOSv2 (\valBestCloningUtmosValue{}), \valBestCloningWavlmSimProvider{} --- по WavLM speaker similarity (\valBestCloningWavlmSimValue{}, при калибровочном same-speaker уровне \valCalibWavlmUpperPFifty{}). Это означает, что лучшая модель достигает $\sim$\,\valBestCloningWavlmSimValue{}\,/\,\valCalibWavlmUpperPFifty{} $\approx$ \,\,$\sim$100\% от потолка человеческого same-speaker similarity на WavLM. На ECAPA картина схожая, но дельта между топ-1 и топ-2 заметно больше.
+
+\subsection{Стоимость}
+\input{tables/costs.tex}
+
+\noindent Таблица~\ref{tab:costs} раскрывает существенный разброс: Google TTS и Azure --- самые дешёвые коммерческие провайдеры (\$16/1M~симв.), Typecast --- самый дорогой (\$143/1M~симв., в $\sim$9 раз дороже Google и в 2.2~раза дороже ElevenLabs). При этом по метрикам качества Typecast не превосходит ни Google, ни ElevenLabs (см. ниже H1.cloning). Open-source модели бесплатны на инференс (кроме амортизации GPU), что даёт им асимптотическое преимущество при больших объёмах.
+
+\subsection{Скорость генерации}
+\label{ssec:speed}
+В Таблицах~\ref{tab:ranking_tts} и~\ref{tab:ranking_cloning} колонка <<Lat~(s)>> содержит среднее время генерации одного файла. Скорость генерации определяется как стенное время от вызова \texttt{POST}-запроса (для облачных API) или метода \texttt{model.generate()} (для локальных моделей) до получения полного аудиобуфера в памяти процесса. Замеры производились последовательно, без батчинга, на одной видеокарте NVIDIA~RTX~4090 для open-source моделей и через интернет-канал из российского сегмента для коммерческих API. Средняя длина целевого аудио составляла около 7~секунд.
+
+Диапазон наблюдаемых значений охватывает более двух порядков величины. В TTS-задаче самой быстрой моделью оказалась \valBestTtsLatencySecondsProvider{} со средним временем генерации \valBestTtsLatencySecondsValue{}~с/файл; самой медленной --- \valWorstTtsLatencySecondsProvider{} (\valWorstTtsLatencySecondsValue{}~с/файл). В voice-cloning-задаче картина аналогична: \valBestCloningLatencySecondsProvider{} обеспечивает \valBestCloningLatencySecondsValue{}~с/файл, \valWorstCloningLatencySecondsProvider{} --- \valWorstCloningLatencySecondsValue{}~с/файл.
+
+Обнаруженный разрыв в $\sim$120 раз между лучшей и худшей моделью имеет прямые практические последствия. Для интерактивных голосовых интерфейсов (диалоговые ассистенты, real-time-озвучивание) допустимо время отклика не более 1--2~секунд: этому требованию удовлетворяют только Google~TTS, ElevenLabs и Azure~Neural Speech. Все локальные open-source модели на одной 4090 не подходят для интерактивного режима без батчинга или квантования (XTTSv2 --- $\sim$3~с/файл, F5-TTS --- $\sim$1.3~с/файл, остальные --- значительно дольше). Особенно медленна линия Fish-Speech, поскольку использует авторегрессионный декодер с GPT-подобной архитектурой и не оптимизирована для одиночного инференса. На Парето-фронтах (Рис.~\ref{fig:pareto_tts} и~\ref{fig:pareto_cloning}) latency сама по себе не отображается как ось, поскольку для интерактивного use-case определяющей является не столько оптимальность по latency, сколько превышение порога $1$--$2$~секунд: облачные API и open-source решения занимают принципиально разные регионы по этому критерию.
+
+\subsection{H1: Парето-оптимальность}
+
+\noindent\textbf{TTS.} Основная проекция включает четыре оси --- (UTMOSv2, NISQA, Whisper-WER, cost\_usd). Парето-фронт содержит \valHOneTtsFrontierSize{} из \valHOneTtsFrontierTotal{} моделей: \valHOneTtsFrontierMembers{}. Гипотеза H1.tts \valHOneTtsVerdict{}.
+
+\noindent\textbf{Cloning.} Основная проекция включает пять осей --- (UTMOSv2, NISQA, WavLM-sim, Whisper-WER, cost\_usd). Парето-фронт содержит \valHOneCloningFrontierSize{} из \valHOneCloningFrontierTotal{} моделей: \valHOneCloningFrontierMembers{}. Единственная модель, не попавшая на фронт --- XTTSv2: её доминирует CosyVoice2 одновременно по UTMOSv2, NISQA, WavLM-sim, WER и cost (cost у обеих $\approx 0$, но CosyVoice2 строго лучше по всем метрикам качества). Гипотеза H1.cloning \valHOneCloningVerdict{}.
+
+\subsubsection{Sensitivity-анализ Парето-фронта}
+\label{ssec:pareto-sensitivity}
+Парето-фронт по построению чувствителен к выбору осей: добавление новой оси, на которой какая-то модель является лидером, делает её недоминируемой. Это особенно важно для нашего случая, поскольку метрики naturalness (UTMOSv2, NISQA) согласуются слабо (см. результаты H2 ниже), а значит несут частично ортогональный сигнал и расширяют фронт.
+
+Таблица~\ref{tab:pareto} показывает результаты sensitivity-анализа --- размер и состав фронта при различных выборах осей. Ключевые наблюдения:
+\begin{itemize}[noitemsep]
+    \item Если в TTS использовать только две оси (UTMOSv2, cost), на фронте остаётся одна модель --- CosyVoice2. С добавлением WER к ней добавляются Google~Neural2 и OpenAI~tts-1; с дальнейшим включением NISQA --- F5-TTS и XTTSv2.
+    \item Для cloning канонический 3D-фронт (UTMOSv2, WavLM-sim, cost) содержит единственную доминирующую модель CosyVoice2. С добавлением WER на фронт возвращаются все три коммерческих cloning-провайдера (ElevenLabs, Typecast, Resemble), поскольку они оптимизированы под минимальный WER ценой меньшей speaker similarity. С добавлением NISQA на фронт попадает F5-TTS.
+    \item Таким образом, нарратив <<CosyVoice2 парето-доминирует все остальные cloning-системы>> справедлив только для упрощённой 3D-проекции и теряется при учёте всех измеренных характеристик. Это согласуется с теоретическим ожиданием: чем больше осей качества, тем больше точек оказывается на фронте.
+\end{itemize}
+
+CosyVoice2 присутствует на фронте во всех проекциях обеих задач, что делает её \textit{универсально парето-оптимальной} моделью в нашем эксперименте. Никакая другая система этим свойством не обладает.
+
+\input{tables/pareto.tex}
+
+\noindent Рис.~\ref{fig:pareto_tts} и~\ref{fig:pareto_cloning} визуализируют упрощённые двумерные проекции Парето-фронта для обеих задач. Полное многомерное вычисление с использованием всех осей (4D для TTS, 5D для cloning) формирует основной verdict H1; двумерные проекции служат для визуальной интерпретации отдельных trade-off-ов. На каждой панели применяется двухуровневая визуализация: \textbf{золотой} контур обозначает модель, входящую в \emph{полный многомерный} Парето-фронт; \textbf{серебряный} --- модель, парето-оптимальную только в данной 2D-проекции (доминируемую в полной размерности); \textbf{чёрный} --- модель, доминируемую везде. Кружки --- коммерческие провайдеры, квадраты --- open-source модели.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{pareto_tts.pdf}
+\caption{Двумерные проекции Парето-фронта для задачи Text-to-Speech, $2 \times 3$ панели --- все возможные пары из четырёх измеренных осей $(\text{UTMOSv2}, \text{NISQA}, \text{Whisper-WER}, \text{cost})$. Верхний ряд: (a)~UTMOSv2 vs NISQA, (b)~UTMOSv2 vs WER, (c)~UTMOSv2 vs Cost. Нижний ряд: (d)~NISQA vs WER, (e)~NISQA vs Cost, (f)~WER vs Cost. Cost-оси --- в логарифмической шкале; открытые модели (XTTSv2, F5-TTS, CosyVoice2, Fish-Speech) имеют нулевой инференс-cost и расположены на левой границе шкалы. Typecast и Resemble на этой фигуре отсутствуют, поскольку не поддерживают TTS-режим. \textbf{Кодирование обводки}: золотой контур --- модель входит в полный 4D Парето-фронт ((UTMOSv2, NISQA, WER, cost), \valHOneTtsFrontierSize{}/\valHOneTtsFrontierTotal{} моделей, перечислены в Таблице~\ref{tab:pareto}); серебряный контур --- модель парето-оптимальна только в данной 2D-проекции, но доминируема в полной размерности; чёрный контур --- доминируема и в 2D, и в полной размерности.}
+\label{fig:pareto_tts}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{pareto_cloning.pdf}
+\caption{Двумерные проекции Парето-фронта для задачи voice cloning, $2 \times 3$ панели. Верхний ряд: (a)~UTMOSv2 vs WavLM speaker similarity, (b)~UTMOSv2 vs Whisper-WER, (c)~UTMOSv2 vs Cost. Нижний ряд: (d)~WavLM-sim vs WER, (e)~WavLM-sim vs Cost, (f)~WER vs Cost. На графиках представлены только провайдеры, выполняющие настоящее zero-shot клонирование голоса (ElevenLabs, Typecast, Resemble, XTTSv2, F5-TTS, CosyVoice2, Fish-Speech~S1, Fish-Speech~S2~Pro). Azure, Google и OpenAI \textbf{глобально исключены} из cloning-анализа, поскольку их cloning-эндпоинты используют фиксированные голоса и не учитывают опорную запись диктора --- они структурно не выполняли задачу, оцениваемую в этом разделе. \textbf{Кодирование обводки}: золотой контур --- модель входит в полный 5D Парето-фронт ((UTMOSv2, NISQA, WavLM-sim, WER, cost), \valHOneCloningFrontierSize{}/\valHOneCloningFrontierTotal{} моделей, перечислены в Таблице~\ref{tab:pareto}); серебряный контур --- парето-оптимальна только в данной 2D-проекции; чёрный контур --- доминируема и в 2D, и в полной размерности.}
+\label{fig:pareto_cloning}
+\end{figure}
+
+\FloatBarrier
+
+\subsection{H2: согласованность метрик}
+
+\noindent\textbf{H2.tts.naturalness.} На системном уровне корреляция UTMOSv2~vs NISQA на TTS-задаче составляет $\rho = \valHTwoTtsNatRho{}$ ($p = \valHTwoTtsNatPval{}$, $N = \valHTwoTtsNatN{}$ провайдеров). Это ниже порога $0.7$. Гипотеза H2.tts.naturalness \valHTwoTtsNatVerdict{}.
+
+\noindent\textbf{H2.cloning.naturalness.} На cloning-задаче $\rho = \valHTwoCloningNatRho{}$ ($p = \valHTwoCloningNatPval{}$). Гипотеза H2.cloning.naturalness \valHTwoCloningNatVerdict{}.
+
+\noindent\textbf{Интерпретация.} Несмотря на то, что обе метрики номинально измеряют «естественность речи», их системные ранги существенно расходятся. Можно предположить, что UTMOSv2 более чувствителен к артефактам нейронного синтеза (плавающие prosody-границы, неестественная просодия), тогда как NISQA --- к классическим артефактам канала и кодека (ширина полосы, спектральные перекосы). Для коммерческих провайдеров с близким к идеальному каналом NISQA быстро упирается в потолок (5.0), что также вносит сжатие диапазона.
+
+\noindent\textbf{H2.cloning.similarity.} На cloning-задаче WavLM~vs ECAPA дают $\rho = \valHTwoCloningSimRho{}$ ($p = \valHTwoCloningSimPval{}$, $N = \valHTwoCloningSimN{}$). Хотя обе метрики архитектурно различны, на системном уровне они почти идентично ранжируют провайдеров. Поскольку нам требовалось $\rho < 0.7$, гипотеза H2.cloning.similarity \valHTwoCloningSimVerdict{}. Этот результат полезен: достаточно использовать любую одну из них.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{correlation_heatmap.pdf}
+\caption{Матрица Spearman-корреляций между метриками на уровне отдельных файлов (по \valNRowsTotal{} строкам метрик; в каждой паре учитываются только строки с непустыми значениями обеих метрик). Сильная положительная корреляция между WavLM- и ECAPA-similarity отражает то, что обе модели измеряют одно и то же; слабая связь UTMOSv2--NISQA подтверждает результат проверки H2.}
+\label{fig:correlation}
+\end{figure}
+
+\subsection{H3: разрыв commercial-vs-OSS}
+
+\input{tables/hypotheses.tex}
+
+\noindent Из Таблицы~\ref{tab:hypotheses} видно, что H3 поддерживается выборочно. Для TTS-натуральности (UTMOSv2, NISQA) разрыв между выборками статистически значим: средняя дельта между коммерческой и open-source моделью составляет \valHThreeTtsUtmosCoGap{} единиц UTMOSv2, тогда как внутри коммерческой выборки разрыв всего \valHThreeTtsUtmosCcGap{}. Однако для WER, для всех cloning-метрик кроме WER различия не значимы. Любопытный случай --- \texttt{h3.cloning.whisper\_wer}: формально CO-разрыв значимо больше CC,OO ($p = $ \valHThreeCloningWhisperWerPval{}), но абсолютные величины настолько малы (порядок $10^{-3}$), что практическая важность сомнительна.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{gap_distribution.pdf}
+\caption{Распределение попарных $|gap|$ внутри типов пар: CC (коммерческий vs коммерческий), CO (mix), OO (open-source vs open-source). Бокс-плоты построены для шести панелей: 3 метрики $\times$ 2 задачи.}
+\label{fig:gap}
+\end{figure}
+
+\FloatBarrier
+
+% =========================================================================
+\FloatBarrier
+
+\section{Обсуждение}
+
+\subsection{Что значит «нет доминирующего TTS»?}
+H1.tts подтвердилась: \valHOneTtsFrontierSize{} моделей из \valHOneTtsFrontierTotal{} на Парето-фронте в основной 4D-проекции (UTMOSv2, NISQA, WER, cost). Выбор TTS-системы зависит от приоритетов: при минимальной цене и максимальной скорости лидирует Google~Neural2, при оптимизации натуральности (UTMOSv2) --- CosyVoice2 (open-source) или Azure~Neural Speech, при сочетании скорости и натуральности --- ElevenLabs (вне фронта, но близок). Ни одна модель не оптимальна по всем четырём осям одновременно. Это согласуется с интуитивным наблюдением, что коммерческие TTS API на текущем этапе развития конкурируют скорее в нишах (поддержка языков, голосов, prosody-разметка), чем в чистом качестве моноязычной речи.
+
+\subsection{CosyVoice2 как универсально парето-оптимальная модель}
+\label{ssec:disc-cosyvoice2}
+В каноническом упрощённом представлении voice-cloning trade-off-а --- двумерной проекции (UTMOSv2, WavLM-similarity, cost) --- CosyVoice2 единолично доминирует над всеми остальными cloning-системами, включая коммерческие ElevenLabs~IVC, Typecast~SSFM-v30 и Resemble~rapid. Это значит, что по naturalness и speaker-similarity CosyVoice2 строго лучше всех коммерческих cloning-API в нашей выборке, а её стоимость при этом нулевая.
+
+При переходе к полной 5-мерной проекции (с добавлением NISQA и WER) на фронт возвращаются все три коммерческих провайдера: они оптимизированы под минимальный WER (3.4--3.6\%) ценой меньшей WavLM-similarity (0.94 у ElevenLabs против 0.96 у CosyVoice2). Однако CosyVoice2 сохраняет позицию на фронте и в этой расширенной проекции. Более того, CosyVoice2 --- единственная модель в нашем эксперименте, попадающая на Парето-фронт во всех изучаемых проекциях обеих задач (Таблица~\ref{tab:pareto}). Возможные объяснения такой универсальной оптимальности:
+\begin{itemize}[noitemsep]
+    \item CosyVoice2 обучена на крупном китайско-английском корпусе с использованием supervised semantic tokens; архитектура с LM-prior и Flow Matching-декодером оказалась эффективной как для естественности, так и для speaker similarity.
+    \item Коммерческие zero-shot cloning-эндпоинты (ElevenLabs Instant, Typecast SSFM-v30, Resemble rapid) приоритизируют latency и стабильность вывода, а не максимальное качество в каждом отдельном файле; их более <<тяжёлые>> предложения требуют few-shot fine-tuning и в наш бенчмарк не вошли (см. ограничения, Раздел~\ref{sec:limitations}).
+    \item Для ElevenLabs в нашем эксперименте использовались дефолтные значения параметров stability (0.5) и similarity (0.75); потенциальное улучшение при их тонкой настройке остаётся открытым вопросом.
+\end{itemize}
+
+\subsection{Метрики качества несут разный сигнал}
+Расхождение между UTMOS и NISQA (Spearman $\rho = \valHTwoTtsNatRho{}$ для TTS и $\rho = \valHTwoCloningNatRho{}$ для cloning при пороге согласованности $0.7$) показывает, что использовать одну метрику для финального вывода рискованно. На практике мы рекомендуем:
+\begin{itemize}[noitemsep]
+    \item Сообщать обе метрики и явно отделять «системную» оценку (mean by provider) от утверждение-уровня.
+    \item При близких значениях UTMOS у нескольких моделей --- использовать NISQA как tie-breaker.
+    \item Для voice cloning достаточно одной из WavLM/ECAPA: они почти идеально согласованы.
+\end{itemize}
+
+\subsection{Стоимость как существенный фактор}
+Разница в стоимости между Google (\$16/1M) и Typecast (\$143/1M) --- почти на порядок, при этом качество последнего не превосходит первого. Для типичного use-case с 1~миллиардом синтезированных символов в год экономия составит \$127K. Это делает выбор провайдера на основе одного только UTMOSv2 практически рискованным.
+
+\subsection{Сильные и слабые стороны автоматических метрик}
+Сильные стороны: дешёвая итерация (5~сек/файл vs минуты на одного слушателя), полная воспроизводимость, отсутствие шума пула. Слабые: UTMOSv2 не различает «правильность интонации в контексте», WER не отражает супраконтекстных ошибок (например, неверное произношение редкого имени, но с правильным распознаванием Whisper). В будущем стоит дополнить пайплайн human listening test для подмножества аудио и сравнить ранги.
+
+\subsection{Сравнение с TTS Arena}
+TTS Arena (open Hugging Face лидерборд) использует только UTMOSv2 как метрику ранжирования и закрытый ELO-rating от случайных слушателей. Сравнение наших UTMOSv2 средних с публичными значениями TTS Arena на момент написания работы:
+\begin{itemize}[noitemsep]
+    \item Наши Azure/OpenAI/ElevenLabs значения в районе 3.6--3.8 совпадают с TTS Arena в пределах $\pm 0.1$.
+    \item CosyVoice2 у нас выше (3.95), чем в TTS Arena ($\sim$3.7) --- возможно, из-за разницы в reference audio и подборки текстов.
+\end{itemize}
+Это подтверждает корректность наших измерений UTMOSv2 и косвенно --- надёжность всего пайплайна.
+
+% =========================================================================
+\section{Ограничения}\label{sec:limitations}
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Английский язык, один корпус.} Все результаты получены на LibriTTS-R \textit{test-clean}, что подразумевает чистую студийную речь и нейтральный домен (аудиокниги). Поведение моделей на эмоциональной речи, шумных условиях, других языках не обобщается.
+    \item \textbf{Дефолтные настройки провайдеров.} Каждый коммерческий API имеет десятки настроек (stability, similarity, speed); мы используем дефолты. Возможно, тонкая настройка изменит ранги.
+    \item \textbf{Только zero-shot voice cloning.} Few-shot режим с обучением на 30~минутах данных диктора у некоторых провайдеров (например, ElevenLabs Pro Voice Clone, Resemble custom voice) даёт качественно другие результаты, но требует существенной ручной работы и не включён в бенчмарк.
+    \item \textbf{Whisper-WER несимметричен.} Whisper сам несовершенен (WER $\sim$2--4\% на чистой английской речи), поэтому ASR-ошибки складываются с TTS-ошибками. Альтернатива --- использовать несколько ASR-систем и брать минимум, но это утяжеляет pipeline.
+    \item \textbf{Resemble выборка меньше.} 6 дикторов из 20 имеют слишком короткие reference, что снижает мощность тестов для Resemble на $\sim$30\%.
+    \item \textbf{Отсутствие human evaluation.} Все наши выводы --- через прокси-метрики. Расхождение UTMOSv2 и NISQA подсказывает, что вопрос «что есть качество» не закрыт.
+\end{enumerate}
+
+% =========================================================================
+\section{Заключение}
+
+В работе представлен бенчмарк \valNProviders{} коммерческих и open-source TTS- и voice-cloning-систем, оценённых на \valNRowsTotal{} аудиозаписях с использованием пяти автоматических метрик. Ключевые наблюдения:
+\begin{itemize}[noitemsep]
+    \item В TTS-задаче не существует доминирующего провайдера; \valHOneTtsFrontierSize{} моделей находятся на Парето-фронте «качество--стоимость».
+    \item В voice-cloning-задаче полный 5D Парето-фронт (UTMOSv2, NISQA, WavLM-sim, WER, cost) содержит \valHOneCloningFrontierSize{} из \valHOneCloningFrontierTotal{} моделей --- доминирующего провайдера нет, но CosyVoice2 (open-source) единственный присутствует на фронте во всех изучаемых проекциях, демонстрируя самое сильное сочетание naturalness, speaker similarity и нулевой стоимости.
+    \item Метрики natural\-ness UTMOSv2 и NISQA не достигают порога согласованности $\rho \geq 0.7$ ($\rho = \valHTwoTtsNatRho{}$ для TTS, $\rho = \valHTwoCloningNatRho{}$ для cloning), что подчёркивает важность отчётности по обеим.
+    \item Метрики speaker similarity WavLM и ECAPA практически идентично ранжируют модели ($\rho = \valHTwoCloningSimRho{}$); можно ограничиться одной.
+    \item Разрыв commercial-vs-OSS подтверждается для TTS-натуральности, но не для качества клонирования.
+\end{itemize}
+Все исходные коды, синтезированные аудио, метрики и таблицы публично доступны и позволяют расширять бенчмарк новыми провайдерами или метриками без пересинтеза существующих файлов.
+
+% =========================================================================
+\begin{thebibliography}{99}
+\bibitem{libritts} H. Zen et al. ``LibriTTS: A corpus derived from LibriSpeech for text-to-speech.'' \textit{Proc. Interspeech 2019}, pp.~1526--1530.
+\bibitem{librittsr} Y. Koizumi et al. ``LibriTTS-R: A restored multi-speaker text-to-speech corpus.'' \textit{Proc. Interspeech 2023}.
+\bibitem{utmos} T. Saeki, T. Saruwatari et al. ``UTMOS v2: Improving MOS prediction with finetuned SSL embeddings.'' \textit{VoiceMOS Challenge 2024}.
+\bibitem{nisqa} G. Mittag, T. M\"ottl, S. M\"oller. ``NISQA: A deep CNN-self-attention model for multidimensional speech quality prediction.'' \textit{Proc. Interspeech 2021}.
+\bibitem{wavlm} S. Chen, C. Wang et al. ``WavLM: Large-scale self-supervised pre-training for full stack speech processing.'' \textit{IEEE JSTSP}, 2022.
+\bibitem{ecapa} B. Desplanques, J. Thienpondt, K. Demuynck. ``ECAPA-TDNN: Emphasized channel attention, propagation and aggregation in TDNN.'' \textit{Proc. Interspeech 2020}.
+\bibitem{ttsarena} Hugging Face. ``TTS Arena: Benchmarking text-to-speech models in the wild.'' \url{https://huggingface.co/spaces/TTS-AGI/TTS-Arena}, 2024.
+\bibitem{voicemos} W.-C. Huang et al. ``The VoiceMOS Challenge 2022: Predicting human MOS judgements of synthetic speech.'' \textit{Proc. Interspeech 2022}; \textit{VoiceMOS Challenge 2024}.
+\bibitem{cosyvoice2} Z. Du et al. ``CosyVoice 2: Scalable streaming speech synthesis with large language models.'' \textit{arXiv:2412.10117}, 2024.
+\bibitem{xttsv2} E. Casanova et al. ``XTTS: A massively multilingual zero-shot text-to-speech model.'' \textit{Proc. Interspeech 2024}.
+\bibitem{f5tts} Y. Chen et al. ``F5-TTS: A fairytaler that fakes fluent and faithful speech with flow matching.'' \textit{arXiv:2410.06885}, 2024.
+\bibitem{somos} G. Maniati et al. ``SOMOS: The Samsung open MOS dataset for the evaluation of neural text-to-speech synthesis.'' \textit{Proc. Interspeech 2022}.
+\end{thebibliography}
+
+\end{document}
