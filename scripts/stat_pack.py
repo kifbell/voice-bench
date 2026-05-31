@@ -32,7 +32,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import bootstrap, mannwhitneyu, spearmanr, wilcoxon
+from scipy.stats import bootstrap, spearmanr, wilcoxon
 
 try:
     from statsmodels.stats.weightstats import ttost_ind
@@ -55,7 +55,7 @@ H3_TOST_DELTAS = {
 # Providers that DO NOT actually perform zero-shot voice cloning -- their
 # "cloning" endpoint just generates audio with a fixed default voice and
 # ignores the reference. We exclude their cloning rows from all cloning-task
-# analyses (Pareto front, Spearman, H3 gap test, bootstrap CI), because the
+# analyses (Pareto front, Spearman, H3 TOST, bootstrap CI), because the
 # task they performed is structurally different from what the other systems did.
 # Their TTS-task rows remain in the TTS analysis as usual.
 FAKE_CLONING_PROVIDERS = ("azure_tts", "google_tts", "openai_tts")

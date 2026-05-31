@@ -594,7 +594,8 @@ pd.concat([existing, pd.DataFrame(rows)]).to_parquet(PARQUET)
 
 ```python
 # src/analysis/stat_pack.py
-from scipy.stats import spearmanr, wilcoxon, mannwhitneyu, bootstrap
+from scipy.stats import spearmanr, wilcoxon, bootstrap
+from statsmodels.stats.weightstats import ttost_ind
 import numpy as np
 
 df = pd.read_parquet("results/metrics.parquet")
@@ -626,16 +627,18 @@ def is_pareto_optimal(points, idx):
 # Bootstrap: какие провайдеры на фронте в ≥95% ресемплов?
 ...
 
-# 10.5 H3: gap commercial-commercial vs commercial-OS
-commercial = {"elevenlabs", "openai"}
-open_source = {"xtts_v2", "f5_tts"}
-cc_gaps = []
-co_gaps = []
-for p1, p2 in itertools.combinations(system_means.index, 2):
-    gap = abs(system_means.loc[p1, "utmos"] - system_means.loc[p2, "utmos"])
-    if {p1, p2} <= commercial: cc_gaps.append(gap)
-    elif (p1 in commercial) ^ (p2 in commercial): co_gaps.append(gap)
-stat, pval = mannwhitneyu(cc_gaps, co_gaps, alternative="less")
+# 10.5 H3: TOST на групповых средних commercial vs open-source
+# Для каждой (задача, метрика) пары проверяем эквивалентность с порогом δ.
+commercial = {"elevenlabs", "openai_tts", "azure_tts", "google_tts", "typecast", "resemble"}
+open_source = {"xtts_v2", "f5_tts", "cosyvoice2", "fish_speech_s1", "fish_speech_s2_pro"}
+delta = {"utmos": 0.20, "nisqa_mos": 0.20, "whisper_wer": 0.05,
+         "wavlm_sim": 0.05, "ecapa_sim": 0.05}
+for metric, d in delta.items():
+    c = system_means.loc[list(system_means.index & commercial), metric].dropna().values
+    o = system_means.loc[list(system_means.index & open_source), metric].dropna().values
+    # ttost_ind возвращает (p, (t1,p1,df1), (t2,p2,df2)); p = max(p1,p2).
+    p, _, _ = ttost_ind(c, o, low=-d, upp=d, usevar="unequal")
+    equivalent = p < 0.05
 ```
 
 Сохранять всё в `results/stats.json`.

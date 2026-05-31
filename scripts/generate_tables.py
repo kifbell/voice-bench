@@ -3,6 +3,7 @@
 Writes one .tex file per table into report/tables/:
   - ranking_tts.tex / ranking_cloning.tex   -- provider x metric mean (95% CI) per task
   - hypotheses.tex                          -- H1/H2/H3 verdicts summary
+  - hypotheses_h3.tex                       -- H3 TOST per-metric breakdown (Section 5.3)
   - costs.tex                               -- per-provider USD/1M chars + actual spend
   - sample_sizes.tex                        -- (provider, task) -> N (non-NaN per metric)
   - pareto.tex                              -- Pareto frontier membership per projection
@@ -216,6 +217,72 @@ ID & Формулировка & Статистика & $p$-value & Итог \\\\
     write_table(out_path, content)
 
 
+# --- H3-only TOST table (Section 5.3) ---
+
+# Display labels for the (task, metric) keys used in stats["hypotheses_verdict"]["h3_tost_equivalence"].
+H3_TASK_DISPLAY = {"tts": "TTS", "cloning": "Cloning"}
+H3_METRIC_DISPLAY = {
+    "utmos": "UTMOSv2",
+    "nisqa_mos": "NISQA",
+    "whisper_wer": "Whisper-WER",
+    "wavlm_sim": "WavLM-sim",
+    "ecapa_sim": "ECAPA-sim",
+}
+
+
+def _h3_row_label(key):
+    # keys look like "h3.tts.utmos", "h3.cloning.wavlm_sim", ...
+    parts = key.split(".", 2)
+    if len(parts) != 3:
+        return key.replace("_", "\\_")
+    _, task, metric = parts
+    task_label = H3_TASK_DISPLAY.get(task, task)
+    metric_label = H3_METRIC_DISPLAY.get(metric, metric.replace("_", "-"))
+    return f"{task_label}, {metric_label}"
+
+
+def gen_hypotheses_h3(stats, out_path):
+    """H3-only breakdown for the body of Section 5.3.
+
+    Reports every (task, metric) TOST cell: group means, observed Delta,
+    pre-registered delta, one-sided p-value, and verdict. The broader
+    H1/H2/H3 summary lives in hypotheses.tex (rendered in the discussion).
+    """
+    h3 = stats["hypotheses_verdict"]["h3_tost_equivalence"]
+
+    body_rows = []
+    for key, sub in h3.items():
+        label = _h3_row_label(key)
+        mean_c = fmt(sub["mean_commercial"])
+        mean_os = fmt(sub["mean_open_source"])
+        delta_obs = fmt(sub["mean_diff"])
+        delta_pre = fmt(sub["delta"])
+        pval = fmt_pval(sub["p_value"])
+        verdict = "\\checkmark" if sub["supports"] else "$\\times$"
+        body_rows.append(
+            f"{label} & ${mean_c}$ & ${mean_os}$ & ${delta_obs}$ & ${delta_pre}$ & {pval} & {verdict} \\\\"
+        )
+
+    body = "\n".join(body_rows)
+    content = f"""% Auto-generated. Do not edit.
+\\begin{{table}}[ht]
+\\centering
+\\caption{{Результаты теста H3 по каждой (задача, метрика)-комбинации. Двусторонний TOST на провайдер-уровневых средних (commercial vs open-source): $H_{{0}}: |\\bar{{x}}_{{C}} - \\bar{{x}}_{{OS}}| \\geq \\delta$. Колонки: $\\bar{{x}}_{{C}}$ --- среднее по commercial-провайдерам, $\\bar{{x}}_{{OS}}$ --- по open-source; $\\Delta$ --- наблюдаемая разность средних; $\\delta$ --- пре-регистрированный порог эквивалентности (см. Раздел~\\ref{{ssec:h3}}). Эквивалентность считается подтверждённой ($\\checkmark$) при $p < 0.05$. Для метрик speaker similarity провайдеры без zero-shot эндпоинта (Azure, Google, OpenAI) исключены.}}
+\\label{{tab:hypotheses_h3}}
+\\resizebox{{\\textwidth}}{{!}}{{%
+\\begin{{tabular}}{{lrrrrlc}}
+\\toprule
+(Задача, Метрика) & $\\bar{{x}}_{{C}}$ & $\\bar{{x}}_{{OS}}$ & $\\Delta$ & $\\delta$ & $p$-value & Итог \\\\
+\\midrule
+{body}
+\\bottomrule
+\\end{{tabular}}%
+}}
+\\end{{table}}
+"""
+    write_table(out_path, content)
+
+
 # --- Costs table ---
 
 def gen_costs(ratecards, stats, out_path):
@@ -403,6 +470,7 @@ def main():
     gen_ranking(stats, "tts", out_dir / "ranking_tts.tex")
     gen_ranking(stats, "cloning", out_dir / "ranking_cloning.tex")
     gen_hypotheses(stats, out_dir / "hypotheses.tex")
+    gen_hypotheses_h3(stats, out_dir / "hypotheses_h3.tex")
     gen_costs(ratecards, stats, out_dir / "costs.tex")
     gen_sample_sizes(args.parquet, out_dir / "sample_sizes.tex")
     gen_pareto(stats, out_dir / "pareto.tex")

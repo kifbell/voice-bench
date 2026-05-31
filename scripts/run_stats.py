@@ -2,7 +2,7 @@
 
 Outputs results/stats.json with: bootstrap means+CIs per (provider, task, metric),
 Spearman ρ between metrics (utterance-level, system-level), Wilcoxon paired tests
-between providers, Pareto-frontier membership, Mann-Whitney for commercial-vs-OS gap.
+between providers, and Pareto-frontier membership.
 
 Gracefully handles degenerate cases (single provider, single task) for pilot
 validation. Skipped tests are recorded in `stats.json['skipped']`.
@@ -19,15 +19,8 @@ warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
-from scipy.stats import bootstrap, spearmanr, wilcoxon, mannwhitneyu
+from scipy.stats import bootstrap, spearmanr, wilcoxon
 
-
-PROVIDER_KIND = {
-    "elevenlabs": "commercial",
-    "openai": "commercial",
-    "f5_tts": "open_source",
-    "xtts_v2": "open_source",
-}
 
 METRICS_NATURALNESS = ["utmos"]      # add 'nisqa_mos' when NISQA is plugged in
 METRICS_INTELLIG = ["whisper_wer"]
@@ -122,32 +115,6 @@ def pareto_membership(df: pd.DataFrame, axes: list[str], maximise: list[bool]) -
     return out
 
 
-def commercial_vs_oss_gap(df: pd.DataFrame, metric: str) -> dict:
-    means = df.groupby(["provider", "task"])[metric].mean().reset_index()
-    means["kind"] = means["provider"].map(PROVIDER_KIND).fillna("unknown")
-
-    out = {"metric": metric, "by_task": {}}
-    for task, g in means.groupby("task"):
-        cc, co = [], []
-        for (i, a), (j, b) in itertools.combinations(g.iterrows(), 2):
-            gap = abs(a[metric] - b[metric])
-            if a["kind"] == "commercial" and b["kind"] == "commercial":
-                cc.append(gap)
-            elif {a["kind"], b["kind"]} == {"commercial", "open_source"}:
-                co.append(gap)
-        result = {"n_cc": len(cc), "n_co": len(co)}
-        if len(cc) >= 1 and len(co) >= 1:
-            stat, pval = mannwhitneyu(cc, co, alternative="less")
-            result["mean_cc"] = float(np.mean(cc))
-            result["mean_co"] = float(np.mean(co))
-            result["stat"] = float(stat)
-            result["p"] = float(pval)
-        else:
-            result["note"] = "insufficient providers in either group"
-        out["by_task"][task] = result
-    return out
-
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--metrics", default="results/metrics.parquet")
@@ -189,12 +156,6 @@ def main() -> int:
     if "utmos" in df.columns and "ecapa_sim" in df.columns:
         pareto["utmos_vs_ecapa"] = pareto_membership(df, ["utmos", "ecapa_sim"], [True, True])
     stats["pareto"] = pareto
-
-    gap_results = []
-    for metric in ("utmos", "wavlm_sim", "ecapa_sim", "whisper_wer"):
-        if metric in df.columns:
-            gap_results.append(commercial_vs_oss_gap(df, metric))
-    stats["commercial_vs_oss"] = gap_results
 
     out_path = root / args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -62,7 +62,7 @@ python scripts/make_figures.py
 
 - **H1.** Providers occupy distinct points on the Pareto frontier in (naturalness, speaker-similarity, cost) — no single dominant API.
 - **H2.** Naturalness predictors (UTMOSv2 ± NISQA) agree across systems; speaker-similarity metrics (WavLM-XVector vs ECAPA-TDNN) diverge.
-- **H3.** The commercial-vs-commercial quality gap is wider than the best-commercial-vs-best-open-source gap.
+- **H3.** On per-(task, metric) TOST tests with pre-registered equivalence margins δ, commercial and open-source provider groups are statistically equivalent in mean (no group has an advantage > δ).
 
 ## License
 
