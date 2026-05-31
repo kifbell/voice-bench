@@ -89,12 +89,193 @@
 
 Оценка проводится по пяти метрикам: UTMOSv2 и NISQA~\cite{nisqa} для естественности; Whisper-WER (faster-whisper \textit{medium}, int8 на CPU, с базовой нормализацией текста через \texttt{jiwer}: нижний регистр, удаление пунктуации, схлопывание пробелов) для разборчивости; WavLM~\cite{wavlm} (\texttt{microsoft/wavlm-base-plus-sv} с x-vector головой) и ECAPA-TDNN~\cite{ecapa} (\texttt{speechbrain/spkrec-ecapa-voxceleb}) для схожести с диктором в задаче voice cloning. Параллельно фиксируются стоимость одной генерации (USD/файл, по официальным ratecards провайдеров) и скорость генерации (стенное время от запроса до получения полного аудиобуфера). Для интерпретации абсолютных значений speaker similarity дополнительно вычислены калибровочные якоря \textit{same-speaker} и \textit{cross-speaker} (Таблица~\ref{tab:calibration}).
 
-\subsection{Пробел в литературе}
-\label{ssec:gap}
-Подробный обзор предшествующих работ приведён в Разделе~\ref{ssec:related-work}: в существующей литературе не обнаружено сравнительных исследований, объединяющих коммерческие и open-source системы, учитывающих стоимость и скорость генерации и публикующих и метрики, и синтезированные аудио. Настоящая работа закрывает этот пробел; формальные требования и сравнение с конкретными предшественниками --- в названном разделе.
+% =========================================================================
+\section{Обзор литературы}
+\label{sec:related-work}
 
-\subsection{Цель и вопрос работы}
-\label{ssec:objective}
+Сравнительные исследования качества систем синтеза речи можно разнести по трём
+сложившимся формам. Первая --- открытые лидерборды на основе слушательских
+оценок: TTS~Arena~\cite{ttsarena} ранжирует системы по ELO-рейтингу от случайных
+слушателей и приводит UTMOSv2 как вторичную метрику; к ограничениям относятся
+непрозрачность исходного набора текстов, отсутствие задачи voice cloning, неучёт
+стоимости и зависимость рейтинга от ежедневно меняющегося пула. Вторая форма ---
+бенчмарки на статичных корпусах в статьях, сопровождающих релизы конкретных
+моделей (Seed-TTS~\cite{seedtts}, CosyVoice\,2~\cite{cosyvoice2},
+CosyVoice\,3~\cite{cosyvoice3}, XTTS~\cite{xttsv2}, F5-TTS~\cite{f5tts},
+VALL-E~\cite{valle} и VALL-E\,2~\cite{valle2}, NaturalSpeech~\cite{naturalspeech} и
+NaturalSpeech\,2~\cite{naturalspeech2}); как правило, они сравнивают предлагаемую
+модель с открытыми предшественниками на собственной выборке. Третья форма ---
+маркетинговые материалы коммерческих провайдеров, где сравнение проводится с
+закрытыми данными и закрытым набором метрик, что исключает независимую
+верификацию.
+
+Сквозная проблема всех трёх форм --- слабая \textbf{воспроизводимость} и почти
+полное отсутствие работ, которые одновременно (а)~публикуют не только числа, но и
+сами синтезированные аудиозаписи, и (б)~явно сравнивают \emph{ранжирования},
+порождаемые разными метриками одного семейства. Именно эти два требования --- ось,
+по которой настоящая работа отличается от предшественников; ниже мы проходим по
+трём гипотезам работы и для каждой указываем релевантную литературу.
+
+% -------------------------------------------------------------------------
+\subsection{Воспроизводимость и обоснование автоматических метрик}
+\label{ssec:rw-repro}
+
+Прямая оценка слушателями (MOS) считается «золотым стандартом», но плохо
+воспроизводима. Chiang, Huang и Lee~\cite{chiang2023} на выборке из 80 статей
+INTERSPEECH 2022 показывают, что детали слушательских тестов почти нигде не
+сообщаются, и --- что важнее --- на одних и тех же аудио, но при разных настройках
+теста получают как минимум три различных ранжирования тех же TTS-моделей. Cooper,
+Huang, Toda и Yamagishi~\cite{cooper2022gen} демонстрируют, что автоматические
+MOS-предикторы хорошо работают внутри своего теста, но плохо обобщаются на новые
+контексты прослушивания, причём невиданные системы --- особенно тяжёлый случай.
+Эти две работы --- основное обоснование нашего выбора в пользу исключительно
+автоматических, полностью воспроизводимых метрик и публикации самих аудио для
+независимой переоценки (ср. позиционную работу об ответственной оценке
+TTS~\cite{responsibleeval}). UTMOSv2~\cite{utmos} (наследник UTMOS~\cite{utmosv1},
+победитель VoiceMOS~Challenge~\cite{voicemos} в варианте T05~\cite{t05}) и
+NISQA~\cite{nisqa,nisqatts} служат стандартными прокси естественности;
+дистрибутивные бенчмарки TTSDS~\cite{ttsds} и TTSDS2~\cite{ttsds2}, а также
+Audio~Turing~Test~\cite{audioturing} и SOMOS~\cite{somos} образуют современный
+методологический контекст. Воспроизводимых работ, публикующих и метрики, и аудио,
+и при этом сравнивающих между собой ранжирования метрик, в литературе крайне мало
+--- этот пробел мы и закрываем.
+
+% -------------------------------------------------------------------------
+\subsection{Контекст гипотезы H1: многокритериальность и отсутствие
+доминирующей модели}
+\label{ssec:rw-h1}
+
+Гипотеза H1 утверждает, что в многомерном пространстве (естественность,
+разборчивость, схожесть с диктором, стоимость, скорость) не существует
+доминирующей модели. Большинство модельно-ориентированных бенчмарков меряют две
+оси --- WER и speaker similarity (SIM): протокол Seed-TTS~\cite{seedtts}
+вычисляет WER через Whisper~\cite{whisper} и SIM через эмбеддинги WavLM~\cite{wavlm},
+и именно этот протокол де-факто воспроизводят CosyVoice\,2/3~\cite{cosyvoice2,cosyvoice3},
+Qwen3-TTS~\cite{qwen3tts} и др. Однако такие сравнения почти никогда не включают
+стоимость и скорость как самостоятельные оси. Отдельная работа об
+отзывчивости open-source TTS~\cite{berlinski} сдвигает фокус именно на
+latency/throughput, но не объединяет его с качеством и не охватывает коммерческие
+API.
+
+Прямых сравнений коммерческих и open-source систем в одном эксперименте мало, и их
+выводы неоднородны. EmergentTTS-Eval~\cite{emergenttts} оценивает и проприетарные
+(ElevenLabs, Deepgram, OpenAI~4o-mini-tts), и открытые системы через
+model-as-a-judge на сложных просодических кейсах и фиксирует разрыв в пользу
+закрытых моделей по ряду аспектов. Работа о Human~Fooling~Rate~\cite{hfr}
+сравнивает 5~коммерческих и 5~open-source систем на слух 135 участников и приходит
+к выводу, что коммерческие модели ближе к «человеческой неотличимости» на
+разговорной речи, тогда как open-source отстают. Эти работы измеряют другие домены
+и метрики, чем наша (нейтральная студийная речь, автоматические метрики), и потому
+их выводы дополняют, а не противоречат нашим: они показывают, что положение
+Парето-фронта существенно зависит от выбора осей. Аналогичные сравнения «платное
+vs открытое» в соседней задаче ASR (например, бенчмарк PennSound) традиционно
+находят преимущество платных сервисов --- контраст, на фоне которого наш результат
+становится содержательным, а не ожидаемым.
+
+% -------------------------------------------------------------------------
+\subsection{Контекст гипотезы H2: согласованность метрик и важность
+выбора эмбеддингов}
+\label{ssec:rw-h2}
+
+Гипотеза H2 проверяет согласованность системных рангов внутри двух семейств
+метрик: естественности (UTMOSv2 vs NISQA) и схожести с диктором (WavLM vs ECAPA).
+
+\paragraph{Естественность: расхождение и его механизм.} Принципиально важно, что мы
+не ограничиваемся констатацией «метрики расходятся», а опираемся на признанный в
+литературе механизм. Во-первых, MOS-предикторы плохо обобщаются между тестовыми
+контекстами и системами~\cite{cooper2022gen}, поэтому две независимо обученные
+модели могут давать разный сигнал на новой выборке провайдеров. Во-вторых, для
+SOTA-систем объективные метрики страдают \emph{насыщением шкалы}, что делает
+ранжирование, особенно по предиктивным MOS-метрикам, ненадёжным: это прямо
+показано в работе об итеративном различении (I2D)~\cite{i2d} и согласуется с
+наблюдениями TTSDS~\cite{ttsds} о том, что MOS-предикторы лишь иногда коррелируют
+с человеческими оценками и в целом не обобщаются. Эти два механизма --- ограниченная
+обобщаемость и насыщение --- объясняют наблюдаемое у нас расхождение UTMOSv2 и
+NISQA и низкую системную корреляцию между ними; NISQA, исторически разработанная
+для оценки канала и кодека, упирается в верхнюю границу шкалы у коммерческих
+провайдеров с чистым каналом.
+
+\paragraph{Схожесть с диктором: выбор эмбеддингов имеет значение.} Косинусная
+близость speaker-эмбеддингов между опорной и синтезированной записью --- основная
+объективная метрика клонирования; её валидность как прокси MUSHRA-оценок показана
+в~\cite{autospksim}, а на её основе построен открытый бенчмарк клонирования
+ClonEval~\cite{cloneval}. При этом результат зависит от того, \emph{какой} энкодер
+выбран. Специальное исследование~\cite{embcompare} сравнивает ECAPA-TDNN, x-vector
+и H/ASP как энкодеры для оценки speaker similarity в zero-shot multi-speaker TTS и
+находит, что выбор энкодера влияет на оценку (ECAPA опережает x-vector, но
+оригинальный H/ASP стабильно лучше обоих), и подчёркивает необходимость
+эмпирической проверки при переиспользовании эмбеддингов из задач распознавания
+диктора. Эта работа важна как явный контрапункт нашему результату H2.similarity:
+на уровне отдельных высказываний выбор энкодера небезразличен, тогда как мы
+обнаруживаем, что на \emph{системном} уровне WavLM~\cite{wavlm} (x-vector голова) и
+ECAPA-TDNN~\cite{ecapa} ранжируют провайдеров почти идентично. Эти два наблюдения
+не противоречат друг другу, а уточняют область применимости: для финального
+ранжирования систем достаточно одной метрики семейства, хотя на уровне utterance
+выбор энкодера ещё может играть роль (ср. также применение ECAPA как speaker
+encoder в multi-speaker TTS~\cite{ecapamultispk}). Систематических работ, которые
+бы сравнивали именно \emph{ранжирования} двух метрик одного семейства между собой
+(а не их корреляцию с человеком), практически нет --- это самостоятельный вклад
+нашей H2.
+
+% -------------------------------------------------------------------------
+\subsection{Контекст гипотезы H3: эквивалентность вместо различия}
+\label{ssec:rw-h3}
+
+Гипотеза H3 формулируется как утверждение об \emph{эквивалентности} коммерческой и
+open-source групп в пределах методологически значимого порога $\delta$, а не как
+тест на различие. Это методологически нетипично для области синтеза речи.
+Сложившаяся практика сравнения TTS ориентирована именно на обнаружение различий ---
+характерна уже работа Chevelu et al.~\cite{chevelu2015} с подзаголовком
+«methodology focused on differences», где отмечается, что случайный выбор сэмплов
+сглаживает различия и приводит к ложному выводу о незначимости улучшения. Заявления
+о «human parity» также строятся на тестах различия: NaturalSpeech~\cite{naturalspeech}
+объявляет паритет с человеком через отсутствие статистически значимой разницы в
+Wilcoxon-тесте. Между тем отсутствие значимого различия не равно эквивалентности ---
+именно это разграничение лежит в основе процедуры TOST (two one-sided tests), для
+которой каноническими методологическими ссылками служат
+Lakens~\cite{lakens2017} и Lakens, Scheel и Isager~\cite{lakens2018}: задаётся
+наименьший интересующий эффект $\delta$ и проверяются две односторонние гипотезы,
+причём авторы прямо предупреждают о распространённой ошибке вывода «эффекта нет» из
+статистической незначимости. Применений TOST/non-inferiority-тестирования к
+сравнению TTS-систем в литературе мы не обнаружили, что делает методологию H3
+самостоятельным вкладом.
+
+Содержательно наш вывод H3 (на ключевых для пользователя осях --- разборчивости и
+схожести голоса --- open-source эквивалентен коммерческим) нетривиален, поскольку
+доминирующий нарратив и часть свежих работ утверждают обратное: разрыв в пользу
+закрытых систем фиксируют EmergentTTS-Eval~\cite{emergenttts} на сложных кейсах и
+работа о Human~Fooling~Rate~\cite{hfr} на разговорной речи. Одновременно
+независимые релизы подтверждают, что разрыв на стандартных осях закрывается:
+CosyVoice\,3~\cite{cosyvoice3} заявляет SOTA по content consistency, speaker
+similarity и prosody naturalness, а Qwen3-TTS~\cite{qwen3tts} --- наименьший WER на
+Seed-TTS и превосходство над коммерческими MiniMax и ElevenLabs по speaker
+similarity. То, что именно линейка CosyVoice оказывается у нас универсально
+Парето-оптимальной, согласуется с этим трендом. Наконец, подтверждённая нами
+эквивалентность по Whisper-WER не является артефактом: поскольку у современных
+систем разборчивость упирается в «пол» (WER, близкий к реальной речи; см.
+\cite{ttsds2,i2d}), дискриминирующий сигнал смещается с WER на естественность и
+схожесть, и потому информативны именно два случая, где разрыв превышает $\delta$ в
+противоположные стороны.
+
+% -------------------------------------------------------------------------
+\subsection{Пробел в литературе}
+\label{ssec:rw-gap}
+
+Суммируя, в существующей литературе не обнаружено работ, удовлетворяющих
+одновременно условиям: (а)~совместное сравнение коммерческих API и open-source
+моделей в едином эксперименте на едином корпусе и наборе метрик;
+(б)~явный учёт стоимости и скорости генерации как самостоятельных осей;
+(в)~публичная доступность как численных результатов, так и самих синтезированных
+аудиозаписей для независимой переоценки;
+(г)~прямое сравнение \emph{ранжирований}, порождаемых разными метриками одного
+семейства (естественность; схожесть с диктором);
+(д)~постановка вопроса о паритете лагерей как формального теста
+\emph{эквивалентности} (TOST), а не теста на различие.
+Настоящая работа закрывает указанный пробел.
+
+% =========================================================================
+\section{Цель и вопросы работы}
+\label{sec:objective}
 \textbf{Основной исследовательский вопрос:} \textit{какие из современных систем синтеза речи и клонирования голоса составляют Парето-оптимальное множество в пространстве (естественность, разборчивость, схожесть с диктором, стоимость, скорость генерации) на корпусе LibriTTS-R test-clean (английская студийная речь), и достигла ли группа open-source моделей в среднем эквивалентности с группой коммерческих провайдеров по качественным метрикам в пределах методологически значимого порога $\delta$?}
 
 Этот вопрос декомпозируется в три формальные гипотезы, проверяемые в Разделе~\ref{sec:hypotheses}:
@@ -117,15 +298,7 @@
 \end{itemize}
 
 % =========================================================================
-\section{Обзор литературы и автоматические метрики}
-
-\subsection{Родственные работы и пробел в литературе}
-\label{ssec:related-work}
-Сравнительные исследования качества TTS-систем в основном принимают одну из трёх форм. Первая --- открытые лидерборды на основе слушательских оценок: TTS~Arena~\cite{ttsarena} ранжирует системы по ELO-rating от случайных слушателей в чат-интерфейсе на платформе Hugging Face и приводит UTMOSv2 как вторичную метрику. К ограничениям относятся непрозрачность исходного набора текстов, отсутствие задачи voice cloning, неучёт стоимостной оси и зависимость рейтингов от ежедневно меняющегося пула. Вторая форма --- бенчмарки на статичных корпусах в академических статьях, сопровождающих релизы конкретных моделей. Работа о CosyVoice2~\cite{cosyvoice2} сравнивает предлагаемую модель с XTTSv2 и собственными предшественниками на LibriTTS-R и SEED~corpus, сообщая метрики SECS (speaker embedding cosine similarity) и WER. Аналогично, XTTSv2~\cite{xttsv2} и F5-TTS~\cite{f5tts} проводят сравнения исключительно в open-source выборке, фокусируясь на мультиязычности или диффузионной архитектуре соответственно. Третья форма --- маркетинговые материалы коммерческих провайдеров, где сравнение проводится с собственной выборкой и собственным набором метрик, что исключает независимую верификацию.
-
-Отдельную линию работ образуют исследования самих метрик качества. VoiceMOS~Challenge 2022 и 2024~\cite{voicemos} организовали конкурсы по предсказанию MOS, в результате чего были предложены модели UTMOSv2, MOSnet, NORESQA-MOS; на тестовом сплите VoiceMOS~Challenge UTMOSv2 демонстрирует корреляцию Пирсона $r \geq 0.94$ с агрегированными человеческими оценками. NISQA~\cite{nisqa} разрабатывалась изначально для оценки телефонной речи, но применима и к синтезу. SOMOS~\cite{somos} --- крупнейший публичный датасет MOS-аннотаций для современного нейронного TTS, использовался при тренировке UTMOSv2.
-
-В существующей литературе не обнаружено работ, удовлетворяющих одновременно трём условиям: (а)~совместное сравнение коммерческих API и open-source моделей в едином эксперименте; (б)~явный учёт стоимости и скорости генерации как самостоятельных осей; (в)~публичная доступность как численных результатов, так и самих синтезированных аудиозаписей для независимой переоценки. Настоящая работа закрывает указанный пробел.
+\section{Автоматические метрики}
 
 \subsection{Корпуса для оценки TTS}
 LibriTTS~\cite{libritts} --- стандартный корпус для исследований нейронного TTS, содержащий 585~часов английской речи 2456 дикторов; разделён на чистые и шумные части, сопровождается тщательной нормализацией текстов. LibriTTS-R~\cite{librittsr} --- его улучшенная версия с применённой моделью DEMUCS для шумоподавления. Подвыборка \textit{test-clean} содержит 39~дикторов и широко используется как тестовый сплит в работах по few-shot voice cloning.
@@ -413,18 +586,69 @@ TTS Arena (open Hugging Face лидерборд) использует тольк
 
 % =========================================================================
 \begin{thebibliography}{99}
+
+% --- Существовавшие в дипломе источники (ключи сохранены) ---
 \bibitem{libritts} H. Zen et al. ``LibriTTS: A corpus derived from LibriSpeech for text-to-speech.'' \textit{Proc. Interspeech 2019}, pp.~1526--1530.
 \bibitem{librittsr} Y. Koizumi et al. ``LibriTTS-R: A restored multi-speaker text-to-speech corpus.'' \textit{Proc. Interspeech 2023}.
-\bibitem{utmos} T. Saeki, T. Saruwatari et al. ``UTMOS v2: Improving MOS prediction with finetuned SSL embeddings.'' \textit{VoiceMOS Challenge 2024}.
-\bibitem{nisqa} G. Mittag, T. M\"ottl, S. M\"oller. ``NISQA: A deep CNN-self-attention model for multidimensional speech quality prediction.'' \textit{Proc. Interspeech 2021}.
+\bibitem{utmos} T. Saeki, T. Saruwatari et al. ``UTMOSv2: Improving MOS prediction with finetuned SSL embeddings.'' \textit{VoiceMOS Challenge 2024}.
+\bibitem{nisqa} G. Mittag, B. Naderi, A. Chehadi, S. M\"oller. ``NISQA: A deep CNN-self-attention model for multidimensional speech quality prediction with crowdsourced datasets.'' \textit{Proc. Interspeech 2021}; arXiv:2104.09494.
 \bibitem{wavlm} S. Chen, C. Wang et al. ``WavLM: Large-scale self-supervised pre-training for full stack speech processing.'' \textit{IEEE JSTSP}, 2022.
-\bibitem{ecapa} B. Desplanques, J. Thienpondt, K. Demuynck. ``ECAPA-TDNN: Emphasized channel attention, propagation and aggregation in TDNN.'' \textit{Proc. Interspeech 2020}.
+\bibitem{ecapa} B. Desplanques, J. Thienpondt, K. Demuynck. ``ECAPA-TDNN: Emphasized channel attention, propagation and aggregation in TDNN based speaker verification.'' \textit{Proc. Interspeech 2020}.
 \bibitem{ttsarena} Hugging Face. ``TTS Arena: Benchmarking text-to-speech models in the wild.'' \url{https://huggingface.co/spaces/TTS-AGI/TTS-Arena}, 2024.
-\bibitem{voicemos} W.-C. Huang et al. ``The VoiceMOS Challenge 2022: Predicting human MOS judgements of synthetic speech.'' \textit{Proc. Interspeech 2022}; \textit{VoiceMOS Challenge 2024}.
-\bibitem{cosyvoice2} Z. Du et al. ``CosyVoice 2: Scalable streaming speech synthesis with large language models.'' \textit{arXiv:2412.10117}, 2024.
-\bibitem{xttsv2} E. Casanova et al. ``XTTS: A massively multilingual zero-shot text-to-speech model.'' \textit{Proc. Interspeech 2024}.
-\bibitem{f5tts} Y. Chen et al. ``F5-TTS: A fairytaler that fakes fluent and faithful speech with flow matching.'' \textit{arXiv:2410.06885}, 2024.
+\bibitem{voicemos} W.-C. Huang et al. ``The VoiceMOS Challenge 2022: Predicting human MOS judgements of synthetic speech.'' \textit{Proc. Interspeech 2022}; arXiv:2203.11389. См. также VoiceMOS Challenge 2024, arXiv:2409.07001.
+\bibitem{cosyvoice2} Z. Du et al. ``CosyVoice~2: Scalable streaming speech synthesis with large language models.'' arXiv:2412.10117, 2024.
+\bibitem{xttsv2} E. Casanova et al. ``XTTS: A massively multilingual zero-shot text-to-speech model.'' \textit{Proc. Interspeech 2024}; arXiv:2406.04904.
+\bibitem{f5tts} Y. Chen et al. ``F5-TTS: A fairytaler that fakes fluent and faithful speech with flow matching.'' arXiv:2410.06885, 2024.
 \bibitem{somos} G. Maniati et al. ``SOMOS: The Samsung open MOS dataset for the evaluation of neural text-to-speech synthesis.'' \textit{Proc. Interspeech 2022}.
+
+% --- Воспроизводимость и методология оценки ---
+\bibitem{chiang2023} C.-H. Chiang, W.-P. Huang, H.-Y. Lee. ``Why we should report the details in subjective evaluation of TTS more rigorously.'' \textit{Proc. Interspeech 2023}; arXiv:2306.02044.
+\bibitem{cooper2022gen} E. Cooper, W.-C. Huang, T. Toda, J. Yamagishi. ``Generalization ability of MOS prediction networks.'' \textit{Proc. ICASSP 2022}; arXiv:2110.02635.
+\bibitem{responsibleeval} ``Position: Towards Responsible Evaluation for Text-to-Speech.'' arXiv:2510.06927, 2025.
+\bibitem{i2d} ``Iterate to Differentiate: Enhancing discriminability and reliability in zero-shot TTS evaluation.'' arXiv:2603.24430, 2026.
+\bibitem{utmosv1} T. Saeki, D. Xin, W. Nakata, T. Koriyama, S. Takamichi, H. Saruwatari. ``UTMOS: UTokyo-SaruLab system for VoiceMOS Challenge 2022.'' \textit{Proc. Interspeech 2022}; arXiv:2204.02152.
+\bibitem{t05} K. Baba et al. ``The T05 system for VoiceMOS Challenge 2024: Transfer learning from deep image classifier to naturalness MOS prediction.'' \textit{Proc. SLT 2024}; arXiv:2409.09305.
+\bibitem{nisqatts} G. Mittag, S. M\"oller. ``Deep learning based assessment of synthetic speech naturalness.'' \textit{Proc. Interspeech 2020}.
+
+% --- Бенчмарки и дистрибутивные метрики ---
+\bibitem{ttsds} C. Minixhofer, O. Klejch, P. Bell. ``TTSDS --- Text-to-Speech Distribution Score.'' \textit{Proc. SLT 2024}; arXiv:2407.12707.
+\bibitem{ttsds2} C. Minixhofer et al. ``TTSDS2: Resources and benchmark for evaluating human-quality text to speech systems.'' arXiv:2506.19441, 2025.
+\bibitem{cloneval} A. Lema\'nski, P. Junczyk et al. ``ClonEval: An open voice cloning benchmark.'' arXiv:2504.20581, 2025.
+\bibitem{voicemos2023} E. Cooper et al. ``The VoiceMOS Challenge 2023: Zero-shot subjective speech quality prediction for multiple domains.'' arXiv:2310.02640, 2023.
+\bibitem{audioturing} S. Wang, Y. Zhao et al. ``Audio Turing Test: Benchmarking the human-likeness of LLM-based TTS systems.'' arXiv:2505.11200, 2025.
+\bibitem{berlinski} Berlinski, Pomerleau et al. ``Benchmarking the responsiveness of open-source TTS systems.'' \textit{Computers (MDPI)}, 2025.
+
+% --- Прямые сравнения commercial vs open-source ---
+\bibitem{emergenttts} R. R. Manku, Y. Tang, X. Shi, M. Li, A. Smola. ``EmergentTTS-Eval: Evaluating TTS models on complex prosodic, expressiveness, and linguistic challenges using model-as-a-judge.'' \textit{NeurIPS 2025}; arXiv:2505.23009.
+\bibitem{hfr} ``The State of TTS: A case study with human fooling rates.'' arXiv:2508.04179, 2025.
+
+% --- Метрики speaker similarity и выбор эмбеддингов ---
+\bibitem{embcompare} ``An exploration of ECAPA-TDNN and x-vector speaker representations in zero-shot multi-speaker TTS.'' arXiv:2506.20190, 2025.
+\bibitem{autospksim} ``Automatic evaluation of speaker similarity.'' Amazon; arXiv:2207.00344, 2022.
+\bibitem{ecapamultispk} J. Xue, Y. Wang, J. Zhang, C. Liu, J. Tao. ``ECAPA-TDNN for multi-speaker text-to-speech synthesis.'' arXiv:2203.10473, 2022.
+
+% --- Протокол объективной оценки (WER+SIM) и ASR ---
+\bibitem{seedtts} P. Anastassiou et al. ``Seed-TTS: A family of high-quality versatile speech generation models.'' arXiv:2406.02430, 2024. (Протокол Seed-TTS-eval: WER через Whisper-large-v3, SIM через WavLM-large.)
+\bibitem{whisper} A. Radford, J. W. Kim, T. Xu, G. Brockman, C. McLeavey, I. Sutskever. ``Robust speech recognition via large-scale weak supervision.'' \textit{ICML 2023}; arXiv:2212.04356.
+
+% --- Тест эквивалентности (TOST) ---
+\bibitem{lakens2017} D. Lakens. ``Equivalence tests: A practical primer for $t$-tests, correlations, and meta-analyses.'' \textit{Social Psychological and Personality Science}, 8(4), 2017.
+\bibitem{lakens2018} D. Lakens, A. M. Scheel, P. M. Isager. ``Equivalence testing for psychological research: A tutorial.'' \textit{Advances in Methods and Practices in Psychological Science}, 1(2), 2018.
+
+% --- Методология сравнения TTS, ориентированная на различия ---
+\bibitem{chevelu2015} J. Chevelu et al. ``How to compare TTS systems: a new subjective evaluation methodology focused on differences.'' \textit{Proc. Interspeech 2015}.
+
+% --- TTS-системы (контекст SOTA) ---
+\bibitem{cosyvoice3} Z. Du, C. Gao, Y. Wang et al. ``CosyVoice~3: Towards in-the-wild speech generation via scaling-up and post-training.'' arXiv:2505.17589, 2025.
+\bibitem{qwen3tts} ``Qwen3-TTS Technical Report.'' arXiv:2601.15621, 2026.
+\bibitem{valle} C. Wang et al. ``Neural codec language models are zero-shot text to speech synthesizers (VALL-E).'' arXiv:2301.02111, 2023.
+\bibitem{valle2} S. Chen et al. ``VALL-E~2: Neural codec language models are human parity zero-shot TTS synthesizers.'' arXiv:2406.05370, 2024.
+\bibitem{naturalspeech} X. Tan et al. ``NaturalSpeech: End-to-end text to speech synthesis with human-level quality.'' \textit{IEEE TPAMI}; arXiv:2205.04421.
+\bibitem{naturalspeech2} K. Shen et al. ``NaturalSpeech~2: Latent diffusion models are natural and zero-shot speech and singing synthesizers.'' arXiv:2304.09116, 2023.
+
+% --- Обзор ---
+\bibitem{ttssurvey} X. Tan, T. Qin, F. Soong, T.-Y. Liu. ``A survey on neural speech synthesis.'' arXiv:2106.15561, 2021.
+
 \end{thebibliography}
 
 \end{document}
