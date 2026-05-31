@@ -161,7 +161,7 @@ Cosine similarity speaker-эмбеддингов между опорной за�
     \item \textbf{Typecast} и \textbf{Resemble} были проверены только на задаче voice cloning (TTS-режим у этих провайдеров отсутствует).
     \item У \textbf{Resemble} 6 дикторов из 20 имеют опорную запись короче 10 секунд, что нарушает требования rapid-clone эндпоинта; они исключены, итого 280 файлов в cloning-задаче.
 \end{itemize}
-Итоговый объём сгенерированного корпуса --- \valNRowsTotal{} файлов; объём, используемый в статистическом анализе --- \valNRowsAnalysed{} файлов (Таблица~\ref{tab:sample_sizes} перечисляет все строки, попадающие в анализ; cloning-строки Azure / Google / OpenAI в таблице не показаны, так как полностью исключены).
+Итоговый объём сгенерированного корпуса --- \valNRowsAnalysed{} файлов; перечень всех строк, попадающих в анализ, приведён в Таблице~\ref{tab:sample_sizes}.
 
 \input{tables/sample_sizes.tex}
 
@@ -399,7 +399,7 @@ TTS Arena (open Hugging Face лидерборд) использует тольк
 % =========================================================================
 \section{Заключение}
 
-В работе представлен бенчмарк \valNProviders{} коммерческих и open-source TTS- и voice-cloning-систем, сгенерировавших \valNRowsTotal{} аудиозаписей; статистический анализ проводится на \valNRowsAnalysed{} файлах (cloning-файлы Azure / Google / OpenAI исключены) с использованием пяти автоматических метрик. Ключевые наблюдения:
+В работе представлен бенчмарк \valNProviders{} коммерческих и open-source TTS- и voice-cloning-систем, сгенерировавших \valNRowsAnalysed{} аудиозаписей, проанализированных с использованием пяти автоматических метрик. Ключевые наблюдения:
 \begin{itemize}[noitemsep]
     \item В TTS-задаче не существует доминирующего провайдера; \valHOneTtsFrontierSize{} моделей находятся на Парето-фронте «качество--стоимость».
     \item В voice-cloning-задаче полный 5D Парето-фронт (UTMOSv2, NISQA, WavLM-sim, WER, cost) содержит \valHOneCloningFrontierSize{} из \valHOneCloningFrontierTotal{} моделей --- доминирующего провайдера нет, но CosyVoice2 (open-source) единственная присутствует на фронте во всех изучаемых проекциях, демонстрируя самое сильное сочетание naturalness, speaker similarity и нулевой стоимости.

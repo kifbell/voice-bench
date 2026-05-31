@@ -47,9 +47,7 @@ def _safe_cmd_name(s):
 
 def emit_commands(stats):
     meta = stats["meta"]
-    yield "valNRowsTotal", str(meta.get("n_rows_raw", meta.get("n_rows", "--")))
     yield "valNRowsAnalysed", str(meta.get("n_rows_analysed", meta.get("n_rows", "--")))
-    yield "valNRowsExcluded", str(int(meta.get("n_rows_raw", 0)) - int(meta.get("n_rows_analysed", 0)))
     yield "valNProviders", str(len(meta["providers"]))
     yield "valNSpeakers", "20"
     yield "valNUtterancesPerSpeaker", "20"
