@@ -54,21 +54,32 @@ reference).
 
 **Test**: Spearman ρ on the 9 providers × 2 metrics matrix.
 
-### H3.tts -- OSS vs commercial gap on TTS
+### H3.tts -- Equivalence: commercial does not beat OSS on TTS by more than δ
 
-On the TTS task, the average pairwise gap between commercial providers
-(CC) is smaller than the average gap between commercial and open-source
-providers (CO). Equivalently, OSS providers form a separate, lower cluster
-than commercial.
+On the standardised LibriTTS-R test-clean benchmark, commercial TTS providers
+do **not** outperform open-source models on average quality metrics by more
+than a methodologically meaningful margin δ. The thresholds δ are chosen per
+metric to be just below "user-noticeable" effect sizes:
+
+- δ_utmos = 0.2 (UTMOS units, 1-5 scale)
+- δ_nisqa = 0.2 (NISQA-MOS units, 1-5 scale)
+- δ_wer = 0.05 (5 percentage points absolute WER)
 
 Tested separately per quality metric:
 - H3.tts.utmos
 - H3.tts.nisqa_mos
 - H3.tts.whisper_wer
 
-**Test**: per metric, compute |gap| for every CC and CO provider pair on
-system-level means; Mann-Whitney U with the alternative "CC gaps stochastically
-less than CO gaps". Verdict per metric.
+**Test**: per metric, Two One-Sided Tests (TOST) for equivalence on the
+provider-level means of the commercial group vs the open-source group.
+
+  H0_TOST: |mean(commercial) - mean(open_source)| >= δ  (non-equivalence)
+  H1_TOST: |mean(commercial) - mean(open_source)| <  δ  (equivalence)
+
+Equivalence is established when both one-sided p-values are below α = 0.05.
+Higher-is-better metrics (UTMOS, NISQA) and lower-is-better (WER) use the
+same symmetric ±δ interval; the directional interpretation is folded into
+the metric sign.
 
 ---
 
@@ -123,20 +134,29 @@ quality and multi-metric reporting is necessary.
 **Test**: Spearman ρ on cloner providers, separately for the naturalness
 and similarity pairs. Both rho values reported with bootstrap CI.
 
-### H3.cloning -- OSS vs commercial gap on cloning
+### H3.cloning -- Equivalence: commercial does not beat OSS on cloning by more than δ
 
-Same as H3.tts but on the cloning task. Computed per metric:
+Same TOST-based equivalence claim as H3.tts but on the cloning task. Per
+metric, the equivalence margin δ is:
+- δ_utmos = 0.2
+- δ_nisqa = 0.2
+- δ_wer = 0.05
+- δ_wavlm_sim = 0.05 (cosine similarity units)
+- δ_ecapa_sim = 0.05 (cosine similarity units)
+
+Tested per metric:
 - H3.cloning.utmos
 - H3.cloning.nisqa_mos
 - H3.cloning.whisper_wer
 - H3.cloning.wavlm_sim (real cloners only)
 - H3.cloning.ecapa_sim (real cloners only)
 
-For similarity metrics the test still uses CC vs CO pair-gaps but only
-considers the subset of providers with real cloning support.
+For similarity metrics the test considers only the subset of providers with
+real zero-shot cloning support (fake cloners excluded).
 
-**Test**: per metric, Mann-Whitney U with alternative "CC gaps less than
-CO gaps". Verdict per metric.
+**Test**: per metric, TOST with margin δ on the provider-level means of the
+commercial vs open-source group. Equivalence supported when both one-sided
+p-values are below α = 0.05.
 
 ---
 

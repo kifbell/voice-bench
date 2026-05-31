@@ -181,10 +181,13 @@ def gen_hypotheses(stats, out_path):
                  fmt_pval(h2sim['h2.cloning.similarity']['p_value']),
                  h2sim['h2.cloning.similarity']['supports']))
 
-    h3 = hv["h3_commercial_vs_oss_gap"]
+    h3 = hv["h3_tost_equivalence"]
     for key, sub in h3.items():
-        rows.append((key.replace("_", "\\_"), "CO-разрыв $>$ CC,OO",
-                     f"CC={fmt(sub['cc_gap_mean'])}, CO={fmt(sub['co_gap_mean'])}, OO={fmt(sub['oo_gap_mean'])}",
+        descr = f"TOST: $|\\bar{{x}}_C - \\bar{{x}}_{{OS}}| < \\delta = {fmt(sub['delta'])}$"
+        stat = (f"$\\bar{{x}}_C = {fmt(sub['mean_commercial'])}$, "
+                f"$\\bar{{x}}_{{OS}} = {fmt(sub['mean_open_source'])}$, "
+                f"$\\Delta = {fmt(sub['mean_diff'])}$")
+        rows.append((key.replace("_", "\\_"), descr, stat,
                      fmt_pval(sub['p_value']),
                      sub['supports']))
 

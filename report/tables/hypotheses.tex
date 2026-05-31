@@ -13,14 +13,14 @@ H1.cloning & Pareto frontier (Cloning) >1 провайдера & 7/8 на Pareto
 H2.tts.nat & UTMOSv2 и NISQA согласуются (TTS), $\rho \geq 0.7$ & $\rho = 0.500$ & 0.170 & $\times$ \\
 H2.cloning.nat & UTMOSv2 и NISQA согласуются (Cloning), $\rho \geq 0.7$ & $\rho = -0.190$ & 0.651 & $\times$ \\
 H2.cloning.sim & WavLM и ECAPA расходятся (Cloning), $\rho < 0.7$ & $\rho = 0.976$ & $< 0.001$ & $\times$ \\
-h3.tts.utmos & CO-разрыв $>$ CC,OO & CC=0.092, CO=0.240, OO=0.252 & 0.029 & \checkmark \\
-h3.tts.nisqa\_mos & CO-разрыв $>$ CC,OO & CC=0.134, CO=0.374, OO=0.356 & 0.123 & $\times$ \\
-h3.tts.whisper\_wer & CO-разрыв $>$ CC,OO & CC=0.000, CO=0.003, OO=0.003 & 0.004 & \checkmark \\
-h3.cloning.utmos & CO-разрыв $>$ CC,OO & CC=0.315, CO=0.207, OO=0.219 & 0.677 & $\times$ \\
-h3.cloning.nisqa\_mos & CO-разрыв $>$ CC,OO & CC=0.127, CO=0.134, OO=0.146 & 0.694 & $\times$ \\
-h3.cloning.whisper\_wer & CO-разрыв $>$ CC,OO & CC=0.001, CO=0.006, OO=0.003 & $< 0.001$ & \checkmark \\
-h3.cloning.wavlm\_sim & CO-разрыв $>$ CC,OO & CC=0.009, CO=0.015, OO=0.009 & 0.099 & $\times$ \\
-h3.cloning.ecapa\_sim & CO-разрыв $>$ CC,OO & CC=0.064, CO=0.077, OO=0.057 & 0.323 & $\times$ \\
+h3.tts.utmos & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.200$ & $\bar{x}_C = 3.734$, $\bar{x}_{OS} = 3.580$, $\Delta = +0.154$ & 0.338 & $\times$ \\
+h3.tts.nisqa\_mos & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.200$ & $\bar{x}_C = 4.928$, $\bar{x}_{OS} = 4.553$, $\Delta = +0.374$ & 0.849 & $\times$ \\
+h3.tts.whisper\_wer & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.050$ & $\bar{x}_C = 0.037$, $\bar{x}_{OS} = 0.040$, $\Delta = -0.003$ & $< 0.001$ & \checkmark \\
+h3.cloning.utmos & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.200$ & $\bar{x}_C = 3.436$, $\bar{x}_{OS} = 3.401$, $\Delta = +0.035$ & 0.184 & $\times$ \\
+h3.cloning.nisqa\_mos & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.200$ & $\bar{x}_C = 4.817$, $\bar{x}_{OS} = 4.705$, $\Delta = +0.113$ & 0.160 & $\times$ \\
+h3.cloning.whisper\_wer & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.050$ & $\bar{x}_C = 0.035$, $\bar{x}_{OS} = 0.041$, $\Delta = -0.006$ & $< 0.001$ & \checkmark \\
+h3.cloning.wavlm\_sim & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.050$ & $\bar{x}_C = 0.942$, $\bar{x}_{OS} = 0.957$, $\Delta = -0.015$ & 0.001 & \checkmark \\
+h3.cloning.ecapa\_sim & TOST: $|\bar{x}_C - \bar{x}_{OS}| < \delta = 0.050$ & $\bar{x}_C = 0.665$, $\bar{x}_{OS} = 0.732$, $\Delta = -0.067$ & 0.664 & $\times$ \\
 \bottomrule
 \end{tabular}%
 }

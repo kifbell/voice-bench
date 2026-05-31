@@ -99,12 +99,13 @@ def emit_commands(stats):
     yield "valHTwoCloningSimN", str(h2sim["h2.cloning.similarity"]["n_providers"])
     yield "valHTwoCloningSimVerdict", _bool(h2sim["h2.cloning.similarity"]["supports"])
 
-    h3 = hv["h3_commercial_vs_oss_gap"]
+    h3 = hv["h3_tost_equivalence"]
     for key, sub in h3.items():
         cmd_suffix = _safe_cmd_name(key.replace("h3.", ""))
-        yield f"valHThree{cmd_suffix}CcGap", _fmt(sub["cc_gap_mean"])
-        yield f"valHThree{cmd_suffix}CoGap", _fmt(sub["co_gap_mean"])
-        yield f"valHThree{cmd_suffix}OoGap", _fmt(sub["oo_gap_mean"])
+        yield f"valHThree{cmd_suffix}Delta", _fmt(sub["delta"])
+        yield f"valHThree{cmd_suffix}MeanCommercial", _fmt(sub["mean_commercial"])
+        yield f"valHThree{cmd_suffix}MeanOpenSource", _fmt(sub["mean_open_source"])
+        yield f"valHThree{cmd_suffix}MeanDiff", _fmt(sub["mean_diff"])
         yield f"valHThree{cmd_suffix}Pval", _pval(sub["p_value"])
         yield f"valHThree{cmd_suffix}Verdict", _bool(sub["supports"])
 

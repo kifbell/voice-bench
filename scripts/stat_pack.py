@@ -10,8 +10,9 @@ writes results/stats.json with:
   4. wilcoxon_providers: paired Wilcoxon (signed-rank) between every provider
      pair on UTMOS / NISQA / WER / WavLM-sim / ECAPA-sim, separately for tts
      and cloning
-  5. mannwhitney_cc_vs_co: H3 test of whether commercial-commercial gaps are
-     smaller than commercial-OS gaps
+  5. h3_tost_equivalence: H3 TOST equivalence test of whether the commercial
+     group does not exceed the open-source group by more than a metric-specific
+     margin delta
   6. pareto_frontiers: provider's Pareto-optimality flag in 3 projections
      (UTMOS x sim x cost, UTMOS x sim x latency), with bootstrap stability
 
@@ -20,8 +21,9 @@ Hypotheses summary (research_plan):
       $/1k chars).
   H2: Naturalness metrics (UTMOSv2, NISQA) agree (Spearman > 0.7);
       similarity metrics (WavLM, ECAPA) diverge.
-  H3: Commercial-commercial UTMOS gap < commercial-OS UTMOS gap (i.e. open
-      source has caught up with commercial).
+  H3: Equivalence: the commercial group's mean does not exceed the
+      open-source group's mean on quality metrics by more than a
+      methodologically meaningful margin delta (TOST test).
 """
 import argparse
 import json
@@ -31,6 +33,23 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.stats import bootstrap, mannwhitneyu, spearmanr, wilcoxon
+
+try:
+    from statsmodels.stats.weightstats import ttost_ind
+except ImportError:  # pragma: no cover -- statsmodels is a soft dep
+    ttost_ind = None
+
+
+# Per-metric equivalence margins for H3 TOST (units match the metric scale).
+# These are the methodologically meaningful "user-noticeable" effect sizes
+# discussed in hypotheses.md / §4.3 of the report.
+H3_TOST_DELTAS = {
+    "utmos": 0.2,
+    "nisqa_mos": 0.2,
+    "whisper_wer": 0.05,
+    "wavlm_sim": 0.05,
+    "ecapa_sim": 0.05,
+}
 
 
 # Providers that DO NOT actually perform zero-shot voice cloning -- their
@@ -214,51 +233,65 @@ def stat_pack(parquet_path: Path, calib_path: Path, ratecards_path: Path | None)
                     wilcox[task][m][f"{p1}__vs__{p2}"] = {"error": str(e)[:100]}
     stats["wilcoxon_paired"] = wilcox
 
-    # ----- 4. H3 Mann-Whitney: commercial-commercial vs commercial-OS gaps -----
+    # ----- 4. H3 TOST equivalence: commercial vs open-source group means -----
+    # For each (task, metric) we collect provider-level means in the
+    # commercial group and in the open-source group, then run TOST against
+    # the metric-specific equivalence margin delta.  H1_TOST (equivalence)
+    # is supported when BOTH one-sided p-values are below alpha=0.05, which
+    # statsmodels.ttost_ind summarises as max(p_lower, p_upper) < alpha.
     h3: dict = {}
-    for task in df["task"].unique():
-        sys_means = df[df["task"] == task].groupby("provider")[list(ALL_METRICS)].mean()
-        h3[task] = {}
-        for m in ALL_METRICS:
-            if m not in sys_means.columns:
-                continue
+    if ttost_ind is None:
+        stats["h3_tost_equivalence"] = {
+            "error": "statsmodels is required for TOST; please `pip install statsmodels`"
+        }
+    else:
+        for task in df["task"].unique():
+            sys_means = df[df["task"] == task].groupby("provider")[list(ALL_METRICS)].mean()
+            h3[task] = {}
             providers = list(sys_means.index)
-            cc_gaps, co_gaps, oo_gaps = [], [], []
-            for p1, p2 in combinations(providers, 2):
-                a, b = sys_means.loc[p1, m], sys_means.loc[p2, m]
-                if pd.isna(a) or pd.isna(b):
+            commercial_provs = [p for p in providers if p in COMMERCIAL]
+            oss_provs = [p for p in providers if p in OPEN_SOURCE]
+            for m in ALL_METRICS:
+                if m not in sys_means.columns:
                     continue
-                gap = abs(a - b)
-                p1_comm = p1 in COMMERCIAL
-                p2_comm = p2 in COMMERCIAL
-                if p1_comm and p2_comm:
-                    cc_gaps.append(gap)
-                elif (not p1_comm) and (not p2_comm):
-                    oo_gaps.append(gap)
-                else:
-                    co_gaps.append(gap)
-            within = cc_gaps + oo_gaps
-            if len(within) >= 3 and len(co_gaps) >= 3:
-                try:
-                    # H3: within-camp gaps (CC ∪ OO) are systematically SMALLER
-                    # than between-camp (CO) gaps.
-                    stat, pval = mannwhitneyu(co_gaps, within, alternative="greater")
+                delta = H3_TOST_DELTAS.get(m)
+                if delta is None:
+                    continue
+                comm_vals = sys_means.loc[commercial_provs, m].dropna().values
+                oss_vals = sys_means.loc[oss_provs, m].dropna().values
+                if len(comm_vals) < 2 or len(oss_vals) < 2:
                     h3[task][m] = {
-                        "stat": float(stat),
-                        "p_value": float(pval),
-                        "alternative": "co_gap_greater_than_within_camp",
-                        "cc_gaps_mean": float(np.mean(cc_gaps)) if cc_gaps else None,
-                        "co_gaps_mean": float(np.mean(co_gaps)),
-                        "oo_gaps_mean": float(np.mean(oo_gaps)) if oo_gaps else None,
-                        "within_gaps_mean": float(np.mean(within)),
-                        "n_cc_pairs": len(cc_gaps),
-                        "n_co_pairs": len(co_gaps),
-                        "n_oo_pairs": len(oo_gaps),
-                        "n_within_pairs": len(within),
+                        "error": "insufficient providers per group (need >= 2 in each)",
+                        "n_commercial": int(len(comm_vals)),
+                        "n_open_source": int(len(oss_vals)),
+                    }
+                    continue
+                try:
+                    pval, t_lower, t_upper = ttost_ind(
+                        comm_vals,
+                        oss_vals,
+                        low=-delta,
+                        upp=delta,
+                        usevar="unequal",
+                    )
+                    p_lower = float(t_lower[1])
+                    p_upper = float(t_upper[1])
+                    overall_p = float(max(p_lower, p_upper))
+                    h3[task][m] = {
+                        "delta": float(delta),
+                        "mean_commercial": float(np.mean(comm_vals)),
+                        "mean_open_source": float(np.mean(oss_vals)),
+                        "mean_diff": float(np.mean(comm_vals) - np.mean(oss_vals)),
+                        "p_lower": p_lower,
+                        "p_upper": p_upper,
+                        "p_value": overall_p,
+                        "equivalent": bool(overall_p < 0.05),
+                        "n_commercial": int(len(comm_vals)),
+                        "n_open_source": int(len(oss_vals)),
                     }
                 except Exception as e:
                     h3[task][m] = {"error": str(e)[:100]}
-    stats["h3_commercial_vs_oss"] = h3
+        stats["h3_tost_equivalence"] = h3
 
     # ----- 5. Pareto frontier (3 projections) -----
     pareto: dict = {}
@@ -330,7 +363,7 @@ def build_verdicts(stats: dict) -> dict:
     verdicts: dict = {}
 
     spear = stats.get("spearman_metric_pairs__system_level", {})
-    h3 = stats.get("h3_commercial_vs_oss", {})
+    h3 = stats.get("h3_tost_equivalence", {})
     pareto = stats.get("pareto_frontier", {})
 
     def find_spear(prefix_task: str, m1: str, m2: str):
@@ -387,8 +420,8 @@ def build_verdicts(stats: dict) -> dict:
         }
     verdicts["h2_similarity_divergence"] = h2_sim
 
-    # H3 per (task, metric): CC gaps < CO gaps via Mann-Whitney U.
-    # Mapping from hypotheses.md:
+    # H3 per (task, metric): TOST equivalence between commercial and OSS group
+    # means with margin delta.  Mapping from hypotheses.md:
     #   H3.tts: utmos, nisqa_mos, whisper_wer
     #   H3.cloning: utmos, nisqa_mos, whisper_wer, wavlm_sim, ecapa_sim
     h3_v: dict = {}
@@ -400,15 +433,18 @@ def build_verdicts(stats: dict) -> dict:
             if "p_value" not in res:
                 continue
             h3_v[f"h3.{task}.{m}"] = {
-                "cc_gap_mean": res["cc_gaps_mean"],
-                "co_gap_mean": res["co_gaps_mean"],
-                "oo_gap_mean": res.get("oo_gaps_mean"),
-                "n_cc_pairs": res["n_cc_pairs"],
-                "n_co_pairs": res["n_co_pairs"],
+                "delta": res["delta"],
+                "mean_commercial": res["mean_commercial"],
+                "mean_open_source": res["mean_open_source"],
+                "mean_diff": res["mean_diff"],
+                "p_lower": res["p_lower"],
+                "p_upper": res["p_upper"],
                 "p_value": res["p_value"],
-                "supports": res["p_value"] < 0.05,
+                "n_commercial": res["n_commercial"],
+                "n_open_source": res["n_open_source"],
+                "supports": res["equivalent"],
             }
-    verdicts["h3_commercial_vs_oss_gap"] = h3_v
+    verdicts["h3_tost_equivalence"] = h3_v
 
     return verdicts
 
