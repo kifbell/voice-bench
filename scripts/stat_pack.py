@@ -10,9 +10,9 @@ writes results/stats.json with:
   4. wilcoxon_providers: paired Wilcoxon (signed-rank) between every provider
      pair on UTMOS / NISQA / WER / WavLM-sim / ECAPA-sim, separately for tts
      and cloning
-  5. h3_tost_equivalence: H3 TOST equivalence test of whether the commercial
-     group does not exceed the open-source group by more than a metric-specific
-     margin delta
+  5. h3_tost_equivalence: H3 two-sided TOST equivalence test of whether the
+     commercial and open-source group means differ by less than a
+     metric-specific margin delta in either direction (|mean_C - mean_OS| < delta)
   6. pareto_frontiers: provider's Pareto-optimality flag in 3 projections
      (UTMOS x sim x cost, UTMOS x sim x latency), with bootstrap stability
 
@@ -21,9 +21,10 @@ Hypotheses summary (research_plan):
       $/1k chars).
   H2: Naturalness metrics (UTMOSv2, NISQA) agree (Spearman > 0.7);
       similarity metrics (WavLM, ECAPA) diverge.
-  H3: Equivalence: the commercial group's mean does not exceed the
-      open-source group's mean on quality metrics by more than a
-      methodologically meaningful margin delta (TOST test).
+  H3: Equivalence: the absolute difference between the commercial group mean
+      and the open-source group mean does not exceed the methodologically
+      meaningful margin delta on quality metrics, in either direction
+      (two-sided TOST with low=-delta, upp=+delta).
 """
 import argparse
 import json

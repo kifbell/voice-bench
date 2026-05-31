@@ -139,9 +139,9 @@ def emit_commands(stats):
             task_cap = task.capitalize()
             m_cap = _safe_cmd_name(m)
             prec = 4 if m in ("cost_usd",) else 3
-            yield f"valBest{task_cap}{m_cap}Provider", best_prov.replace("_", "\\_")
+            yield f"valBest{task_cap}{m_cap}Provider", PROV_DISPLAY.get(best_prov, best_prov.replace("_", "\\_"))
             yield f"valBest{task_cap}{m_cap}Value", _fmt(best_val, prec=prec)
-            yield f"valWorst{task_cap}{m_cap}Provider", worst_prov.replace("_", "\\_")
+            yield f"valWorst{task_cap}{m_cap}Provider", PROV_DISPLAY.get(worst_prov, worst_prov.replace("_", "\\_"))
             yield f"valWorst{task_cap}{m_cap}Value", _fmt(worst_val, prec=prec)
 
 
