@@ -329,6 +329,7 @@ def gen_costs(ratecards, stats, out_path):
 def gen_sample_sizes(parquet_path, out_path):
     df = pd.read_parquet(parquet_path)
     metrics = ["utmos", "nisqa_mos", "whisper_wer", "wavlm_sim", "ecapa_sim"]
+    task_label = {"tts": "TTS", "cloning": "Cloning"}
     rows_data = []
     providers = sorted(df["provider"].unique())
     for prov in providers:
@@ -340,7 +341,7 @@ def gen_sample_sizes(parquet_path, out_path):
                 # Fake-cloning providers: their cloning rows are excluded from
                 # all analytics; drop them from the sample-sizes table too.
                 continue
-            row = [disp(prov), task.upper(), str(len(sub))]
+            row = [disp(prov), task_label[task], str(len(sub))]
             for m in metrics:
                 if m in sub.columns:
                     n_ok = sub[m].notna().sum()
@@ -348,6 +349,15 @@ def gen_sample_sizes(parquet_path, out_path):
                 else:
                     row.append("--")
             rows_data.append(row)
+
+    # Collapse provider name on consecutive rows belonging to the same provider:
+    # show the name only on the first row, leave subsequent ones blank.
+    prev_prov = None
+    for r in rows_data:
+        if r[0] == prev_prov:
+            r[0] = ""
+        else:
+            prev_prov = r[0]
 
     body_rows = [" & ".join(r) + " \\\\" for r in rows_data]
     body = "\n".join(body_rows)
