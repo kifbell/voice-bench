@@ -434,26 +434,30 @@ def gen_calibration(stats, out_path):
     cal = stats.get("calibration_anchors", {})
     if not cal:
         return
+    name_display = {"wavlm": "WavLM", "ecapa": "ECAPA"}
     rows = []
     for metric in ("wavlm", "ecapa"):
         a = cal.get(metric, {})
         rows.append(
-            f"{metric.upper()} & "
+            f"{name_display[metric]} & "
             f"{fmt(a.get('upper_p50'), 3)} & "
-            f"{fmt(a.get('upper_mean'), 3)} $\\pm$ {fmt(a.get('upper_std'), 3)} & "
-            f"{a.get('upper_n','--')} & "
-            f"{fmt(a.get('lower_mean'), 3)} $\\pm$ {fmt(a.get('lower_std'), 3)} & "
-            f"{a.get('lower_n','--')} \\\\"
+            f"${fmt(a.get('upper_mean'), 3)} \\pm {fmt(a.get('upper_std'), 3)}$ "
+            f"({a.get('upper_n','--')}) & "
+            f"${fmt(a.get('lower_mean'), 3)} \\pm {fmt(a.get('lower_std'), 3)}$ "
+            f"({a.get('lower_n','--')}) \\\\"
         )
     body = "\n".join(rows)
     content = f"""% Auto-generated. Do not edit.
 \\begin{{table}}[ht]
 \\centering
-\\caption{{Калибровочные якоря для метрик speaker similarity. «Same-speaker» --- cosine similarity между двумя независимыми утверждениями одного диктора (верхняя граница). «Cross-speaker» --- схожесть между разными дикторами (нижняя граница).}}
+\\small
+\\caption{{Калибровочные якоря для метрик speaker similarity. \\textit{{Same-speaker}} --- cosine similarity между двумя независимыми утверждениями одного диктора (верхняя граница). \\textit{{Cross-speaker}} --- схожесть между записями разных дикторов (нижняя граница). $N_{{up}}$ и $N_{{lo}}$ --- количество случайных пар, использованных для оценки соответствующего якоря.}}
 \\label{{tab:calibration}}
-\\begin{{tabular}}{{lrrrrr}}
+\\begin{{tabular}}{{lccc}}
 \\toprule
-Метрика & Same-speaker $p_{{50}}$ & Same-speaker mean $\\pm$ std & $N_{{up}}$ & Cross-speaker mean $\\pm$ std & $N_{{lo}}$ \\\\
+        & \\multicolumn{{2}}{{c}}{{Same-speaker}} & Cross-speaker \\\\
+\\cmidrule(lr){{2-3}} \\cmidrule(lr){{4-4}}
+Метрика & $p_{{50}}$ & mean $\\pm$ std ($N_{{up}}$) & mean $\\pm$ std ($N_{{lo}}$) \\\\
 \\midrule
 {body}
 \\bottomrule

@@ -1,14 +1,17 @@
 % Auto-generated. Do not edit.
 \begin{table}[ht]
 \centering
-\caption{Калибровочные якоря для метрик speaker similarity. «Same-speaker» --- cosine similarity между двумя независимыми утверждениями одного диктора (верхняя граница). «Cross-speaker» --- схожесть между разными дикторами (нижняя граница).}
+\small
+\caption{Калибровочные якоря для метрик speaker similarity. \textit{Same-speaker} --- cosine similarity между двумя независимыми утверждениями одного диктора (верхняя граница). \textit{Cross-speaker} --- схожесть между записями разных дикторов (нижняя граница). $N_{up}$ и $N_{lo}$ --- количество случайных пар, использованных для оценки соответствующего якоря.}
 \label{tab:calibration}
-\begin{tabular}{lrrrrr}
+\begin{tabular}{lccc}
 \toprule
-Метрика & Same-speaker $p_{50}$ & Same-speaker mean $\pm$ std & $N_{up}$ & Cross-speaker mean $\pm$ std & $N_{lo}$ \\
+        & \multicolumn{2}{c}{Same-speaker} & Cross-speaker \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-4}
+Метрика & $p_{50}$ & mean $\pm$ std ($N_{up}$) & mean $\pm$ std ($N_{lo}$) \\
 \midrule
-WAVLM & 0.958 & 0.946 $\pm$ 0.051 & 100 & 0.686 $\pm$ 0.170 & 190 \\
-ECAPA & 0.703 & 0.676 $\pm$ 0.153 & 100 & 0.223 $\pm$ 0.118 & 190 \\
+WavLM & 0.958 & $0.946 \pm 0.051$ (100) & $0.686 \pm 0.170$ (190) \\
+ECAPA & 0.703 & $0.676 \pm 0.153$ (100) & $0.223 \pm 0.118$ (190) \\
 \bottomrule
 \end{tabular}
 \end{table}
