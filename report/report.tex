@@ -586,72 +586,53 @@ TTS Arena (open Hugging Face лидерборд) использует тольк
 % =========================================================================
 \begin{thebibliography}{99}
 
-% --- Существовавшие в дипломе источники (ключи сохранены) ---
 % Библиографические ссылки оформлены по ГОСТ Р 7.0.5-2008.
+% Порядок --- алфавитный по фамилии первого автора (для безымянных работ --- по
+% первому значимому слову заглавия, артикли A/An/The игнорируются).
+% При совпадении автора --- по году издания.
 
-% --- Корпуса ---
-\bibitem{libritts} Zen H., Dang V., Clark R. [et al.]. LibriTTS: A corpus derived from LibriSpeech for text-to-speech // Proceedings of Interspeech 2019. --- Graz, Austria, 2019. --- P. 1526--1530.
-\bibitem{librittsr} Koizumi Y., Zen H., Karita S. [et al.]. LibriTTS-R: A restored multi-speaker text-to-speech corpus // Proceedings of Interspeech 2023. --- Dublin, Ireland, 2023. --- P. 5496--5500.
-
-% --- Метрики качества и MOS-прокси ---
-\bibitem{utmosv1} Saeki T., Xin D., Nakata W. [et al.]. UTMOS: UTokyo-SaruLab system for VoiceMOS Challenge 2022 // Proceedings of Interspeech 2022. --- Incheon, Korea, 2022. --- P. 4521--4525. --- arXiv:2204.02152.
-\bibitem{utmos} Saeki T., Saruwatari H. UTMOSv2: Improving MOS prediction with finetuned SSL embeddings // VoiceMOS Challenge 2024. --- 2024. --- URL: https://github.com/sarulab-speech/UTMOSv2 (дата обращения: 31.05.2026).
-\bibitem{nisqa} Mittag G., Naderi B., Chehadi A., M\"oller S. NISQA: A deep CNN-self-attention model for multidimensional speech quality prediction with crowdsourced datasets // Proceedings of Interspeech 2021. --- Brno, Czech Republic, 2021. --- P. 2127--2131. --- arXiv:2104.09494.
-\bibitem{nisqatts} Mittag G., M\"oller S. Deep learning based assessment of synthetic speech naturalness // Proceedings of Interspeech 2020. --- Shanghai, China, 2020. --- P. 1748--1752.
-\bibitem{somos} Maniati G., Vioni A., Ellinas N. [et al.]. SOMOS: The Samsung open MOS dataset for the evaluation of neural text-to-speech synthesis // Proceedings of Interspeech 2022. --- Incheon, Korea, 2022. --- P. 2388--2392.
-\bibitem{voicemos} Huang W.-C., Cooper E., Tsao Y. [et al.]. The VoiceMOS Challenge 2022: Predicting human MOS judgements of synthetic speech // Proceedings of Interspeech 2022. --- Incheon, Korea, 2022. --- P. 4536--4540. --- arXiv:2203.11389.
-\bibitem{voicemos2023} Cooper E., Huang W.-C., Tsao Y., Wang H.-M., Yamagishi J. The VoiceMOS Challenge 2023: Zero-shot subjective speech quality prediction for multiple domains. --- 2023. --- arXiv:2310.02640.
-\bibitem{t05} Baba K., Nakata W., Saeki T., Saruwatari H. The T05 system for VoiceMOS Challenge 2024: Transfer learning from deep image classifier to naturalness MOS prediction // Proceedings of SLT 2024. --- Macao, China, 2024. --- arXiv:2409.09305.
-
-% --- Speaker embeddings ---
-\bibitem{wavlm} Chen S., Wang C., Chen Z. [et al.]. WavLM: Large-scale self-supervised pre-training for full stack speech processing // IEEE Journal of Selected Topics in Signal Processing. --- 2022. --- Vol. 16, no. 6. --- P. 1505--1518.
-\bibitem{ecapa} Desplanques B., Thienpondt J., Demuynck K. ECAPA-TDNN: Emphasized channel attention, propagation and aggregation in TDNN based speaker verification // Proceedings of Interspeech 2020. --- Shanghai, China, 2020. --- P. 3830--3834.
-\bibitem{embcompare} An exploration of ECAPA-TDNN and x-vector speaker representations in zero-shot multi-speaker TTS. --- 2025. --- arXiv:2506.20190.
+\bibitem{seedtts} Anastassiou P., Chen J., Chen J. [et al.]. Seed-TTS: A family of high-quality versatile speech generation models. --- 2024. --- arXiv:2406.02430.
 \bibitem{autospksim} Automatic evaluation of speaker similarity. --- Amazon Research. --- 2022. --- arXiv:2207.00344.
-\bibitem{ecapamultispk} Xue J., Wang Y., Zhang J., Liu C., Tao J. ECAPA-TDNN for multi-speaker text-to-speech synthesis. --- 2022. --- arXiv:2203.10473.
-
-% --- Бенчмарки, лидерборды и дистрибутивные метрики ---
-\bibitem{ttsarena} TTS Arena: Benchmarking text-to-speech models in the wild [Electronic resource] / Hugging Face. --- 2024. --- URL: https://huggingface.co/spaces/TTS-AGI/TTS-Arena (дата обращения: 31.05.2026).
-\bibitem{ttsds} Minixhofer C., Klejch O., Bell P. TTSDS --- Text-to-Speech Distribution Score // Proceedings of SLT 2024. --- Macao, China, 2024. --- arXiv:2407.12707.
-\bibitem{ttsds2} Minixhofer C., Klejch O., Bell P. TTSDS2: Resources and benchmark for evaluating human-quality text-to-speech systems. --- 2025. --- arXiv:2506.19441.
-\bibitem{cloneval} Lema\'nski A., Junczyk P., Czarnowski I. ClonEval: An open voice cloning benchmark. --- 2025. --- arXiv:2504.20581.
-\bibitem{audioturing} Wang S., Zhao Y., Liu H. [et al.]. Audio Turing Test: Benchmarking the human-likeness of LLM-based TTS systems. --- 2025. --- arXiv:2505.11200.
+\bibitem{t05} Baba K., Nakata W., Saeki T., Saruwatari H. The T05 system for VoiceMOS Challenge 2024: Transfer learning from deep image classifier to naturalness MOS prediction // Proceedings of SLT 2024. --- Macao, China, 2024. --- arXiv:2409.09305.
 \bibitem{berlinski} Berlinski J., Pomerleau D. Benchmarking the responsiveness of open-source TTS systems // Computers. --- Basel: MDPI, 2025. --- Vol. 14, no. 4.
-
-% --- Воспроизводимость и методология оценки ---
+\bibitem{xttsv2} Casanova E., Davis K., G\"olge E. [et al.]. XTTS: A massively multilingual zero-shot text-to-speech model // Proceedings of Interspeech 2024. --- Kos, Greece, 2024. --- arXiv:2406.04904.
+\bibitem{wavlm} Chen S., Wang C., Chen Z. [et al.]. WavLM: Large-scale self-supervised pre-training for full stack speech processing // IEEE Journal of Selected Topics in Signal Processing. --- 2022. --- Vol. 16, no. 6. --- P. 1505--1518.
+\bibitem{valle2} Chen S., Liu S., Zhou L. [et al.]. VALL-E~2: Neural codec language models are human parity zero-shot TTS synthesizers. --- 2024. --- arXiv:2406.05370.
+\bibitem{f5tts} Chen Y., Niu Z., Ma Z. [et al.]. F5-TTS: A fairytaler that fakes fluent and faithful speech with flow matching. --- 2024. --- arXiv:2410.06885.
+\bibitem{chevelu2015} Chevelu J., Lolive D., Le Maguer S., Guennec D. How to compare TTS systems: a new subjective evaluation methodology focused on differences // Proceedings of Interspeech 2015. --- Dresden, Germany, 2015. --- P. 3469--3473.
 \bibitem{chiang2023} Chiang C.-H., Huang W.-P., Lee H.-Y. Why we should report the details in subjective evaluation of TTS more rigorously // Proceedings of Interspeech 2023. --- Dublin, Ireland, 2023. --- arXiv:2306.02044.
 \bibitem{cooper2022gen} Cooper E., Huang W.-C., Toda T., Yamagishi J. Generalization ability of MOS prediction networks // Proceedings of ICASSP 2022. --- Singapore, 2022. --- P. 8442--8446. --- arXiv:2110.02635.
-\bibitem{responsibleeval} Position: Towards Responsible Evaluation for Text-to-Speech. --- 2025. --- arXiv:2510.06927.
-\bibitem{i2d} Iterate to Differentiate: Enhancing discriminability and reliability in zero-shot TTS evaluation. --- 2026. --- arXiv:2603.24430.
-
-% --- Прямые сравнения коммерческих и open-source систем ---
-\bibitem{emergenttts} Manku R. R., Tang Y., Shi X., Li M., Smola A. EmergentTTS-Eval: Evaluating TTS models on complex prosodic, expressiveness, and linguistic challenges using model-as-a-judge // Proceedings of NeurIPS 2025. --- Vancouver, Canada, 2025. --- arXiv:2505.23009.
-\bibitem{hfr} The State of TTS: A case study with human fooling rates. --- 2025. --- arXiv:2508.04179.
-
-% --- Протокол объективной оценки (WER + SIM) и ASR ---
-\bibitem{seedtts} Anastassiou P., Chen J., Chen J. [et al.]. Seed-TTS: A family of high-quality versatile speech generation models. --- 2024. --- arXiv:2406.02430.
-\bibitem{whisper} Radford A., Kim J. W., Xu T., Brockman G., McLeavey C., Sutskever I. Robust speech recognition via large-scale weak supervision // Proceedings of ICML 2023. --- Honolulu, USA, 2023. --- P. 28492--28518. --- arXiv:2212.04356.
-
-% --- Тест эквивалентности (TOST) ---
-\bibitem{lakens2017} Lakens D. Equivalence tests: A practical primer for $t$-tests, correlations, and meta-analyses // Social Psychological and Personality Science. --- 2017. --- Vol. 8, no. 4. --- P. 355--362.
-\bibitem{lakens2018} Lakens D., Scheel A. M., Isager P. M. Equivalence testing for psychological research: A tutorial // Advances in Methods and Practices in Psychological Science. --- 2018. --- Vol. 1, no. 2. --- P. 259--269.
-
-% --- Методология сравнения TTS, ориентированная на различия ---
-\bibitem{chevelu2015} Chevelu J., Lolive D., Le Maguer S., Guennec D. How to compare TTS systems: a new subjective evaluation methodology focused on differences // Proceedings of Interspeech 2015. --- Dresden, Germany, 2015. --- P. 3469--3473.
-
-% --- Современные TTS-системы (контекст SOTA) ---
+\bibitem{voicemos2023} Cooper E., Huang W.-C., Tsao Y., Wang H.-M., Yamagishi J. The VoiceMOS Challenge 2023: Zero-shot subjective speech quality prediction for multiple domains. --- 2023. --- arXiv:2310.02640.
+\bibitem{ecapa} Desplanques B., Thienpondt J., Demuynck K. ECAPA-TDNN: Emphasized channel attention, propagation and aggregation in TDNN based speaker verification // Proceedings of Interspeech 2020. --- Shanghai, China, 2020. --- P. 3830--3834.
 \bibitem{cosyvoice2} Du Z., Wang Y., Chen Q. [et al.]. CosyVoice~2: Scalable streaming speech synthesis with large language models. --- 2024. --- arXiv:2412.10117.
 \bibitem{cosyvoice3} Du Z., Gao C., Wang Y. [et al.]. CosyVoice~3: Towards in-the-wild speech generation via scaling-up and post-training. --- 2025. --- arXiv:2505.17589.
-\bibitem{xttsv2} Casanova E., Davis K., G\"olge E. [et al.]. XTTS: A massively multilingual zero-shot text-to-speech model // Proceedings of Interspeech 2024. --- Kos, Greece, 2024. --- arXiv:2406.04904.
-\bibitem{f5tts} Chen Y., Niu Z., Ma Z. [et al.]. F5-TTS: A fairytaler that fakes fluent and faithful speech with flow matching. --- 2024. --- arXiv:2410.06885.
+\bibitem{embcompare} An exploration of ECAPA-TDNN and x-vector speaker representations in zero-shot multi-speaker TTS. --- 2025. --- arXiv:2506.20190.
+\bibitem{voicemos} Huang W.-C., Cooper E., Tsao Y. [et al.]. The VoiceMOS Challenge 2022: Predicting human MOS judgements of synthetic speech // Proceedings of Interspeech 2022. --- Incheon, Korea, 2022. --- P. 4536--4540. --- arXiv:2203.11389.
+\bibitem{i2d} Iterate to Differentiate: Enhancing discriminability and reliability in zero-shot TTS evaluation. --- 2026. --- arXiv:2603.24430.
+\bibitem{librittsr} Koizumi Y., Zen H., Karita S. [et al.]. LibriTTS-R: A restored multi-speaker text-to-speech corpus // Proceedings of Interspeech 2023. --- Dublin, Ireland, 2023. --- P. 5496--5500.
+\bibitem{lakens2017} Lakens D. Equivalence tests: A practical primer for $t$-tests, correlations, and meta-analyses // Social Psychological and Personality Science. --- 2017. --- Vol. 8, no. 4. --- P. 355--362.
+\bibitem{lakens2018} Lakens D., Scheel A. M., Isager P. M. Equivalence testing for psychological research: A tutorial // Advances in Methods and Practices in Psychological Science. --- 2018. --- Vol. 1, no. 2. --- P. 259--269.
+\bibitem{cloneval} Lema\'nski A., Junczyk P., Czarnowski I. ClonEval: An open voice cloning benchmark. --- 2025. --- arXiv:2504.20581.
+\bibitem{somos} Maniati G., Vioni A., Ellinas N. [et al.]. SOMOS: The Samsung open MOS dataset for the evaluation of neural text-to-speech synthesis // Proceedings of Interspeech 2022. --- Incheon, Korea, 2022. --- P. 2388--2392.
+\bibitem{emergenttts} Manku R. R., Tang Y., Shi X., Li M., Smola A. EmergentTTS-Eval: Evaluating TTS models on complex prosodic, expressiveness, and linguistic challenges using model-as-a-judge // Proceedings of NeurIPS 2025. --- Vancouver, Canada, 2025. --- arXiv:2505.23009.
+\bibitem{ttsds} Minixhofer C., Klejch O., Bell P. TTSDS --- Text-to-Speech Distribution Score // Proceedings of SLT 2024. --- Macao, China, 2024. --- arXiv:2407.12707.
+\bibitem{ttsds2} Minixhofer C., Klejch O., Bell P. TTSDS2: Resources and benchmark for evaluating human-quality text-to-speech systems. --- 2025. --- arXiv:2506.19441.
+\bibitem{nisqatts} Mittag G., M\"oller S. Deep learning based assessment of synthetic speech naturalness // Proceedings of Interspeech 2020. --- Shanghai, China, 2020. --- P. 1748--1752.
+\bibitem{nisqa} Mittag G., Naderi B., Chehadi A., M\"oller S. NISQA: A deep CNN-self-attention model for multidimensional speech quality prediction with crowdsourced datasets // Proceedings of Interspeech 2021. --- Brno, Czech Republic, 2021. --- P. 2127--2131. --- arXiv:2104.09494.
+\bibitem{responsibleeval} Position: Towards Responsible Evaluation for Text-to-Speech. --- 2025. --- arXiv:2510.06927.
 \bibitem{qwen3tts} Qwen3-TTS Technical Report / Qwen Team. --- 2026. --- arXiv:2601.15621.
-\bibitem{valle} Wang C., Chen S., Wu Y. [et al.]. Neural codec language models are zero-shot text-to-speech synthesizers (VALL-E). --- 2023. --- arXiv:2301.02111.
-\bibitem{valle2} Chen S., Liu S., Zhou L. [et al.]. VALL-E~2: Neural codec language models are human parity zero-shot TTS synthesizers. --- 2024. --- arXiv:2406.05370.
-\bibitem{naturalspeech} Tan X., Chen J., Liu H. [et al.]. NaturalSpeech: End-to-end text-to-speech synthesis with human-level quality // IEEE Transactions on Pattern Analysis and Machine Intelligence. --- 2024. --- arXiv:2205.04421.
+\bibitem{whisper} Radford A., Kim J. W., Xu T., Brockman G., McLeavey C., Sutskever I. Robust speech recognition via large-scale weak supervision // Proceedings of ICML 2023. --- Honolulu, USA, 2023. --- P. 28492--28518. --- arXiv:2212.04356.
+\bibitem{utmosv1} Saeki T., Xin D., Nakata W. [et al.]. UTMOS: UTokyo-SaruLab system for VoiceMOS Challenge 2022 // Proceedings of Interspeech 2022. --- Incheon, Korea, 2022. --- P. 4521--4525. --- arXiv:2204.02152.
+\bibitem{utmos} Saeki T., Saruwatari H. UTMOSv2: Improving MOS prediction with finetuned SSL embeddings // VoiceMOS Challenge 2024. --- 2024. --- URL: https://github.com/sarulab-speech/UTMOSv2 (дата обращения: 31.05.2026).
 \bibitem{naturalspeech2} Shen K., Ju Z., Tan X. [et al.]. NaturalSpeech~2: Latent diffusion models are natural and zero-shot speech and singing synthesizers. --- 2023. --- arXiv:2304.09116.
-
-% --- Обзоры ---
+\bibitem{hfr} The State of TTS: A case study with human fooling rates. --- 2025. --- arXiv:2508.04179.
 \bibitem{ttssurvey} Tan X., Qin T., Soong F., Liu T.-Y. A survey on neural speech synthesis. --- 2021. --- arXiv:2106.15561.
+\bibitem{naturalspeech} Tan X., Chen J., Liu H. [et al.]. NaturalSpeech: End-to-end text-to-speech synthesis with human-level quality // IEEE Transactions on Pattern Analysis and Machine Intelligence. --- 2024. --- arXiv:2205.04421.
+\bibitem{ttsarena} TTS Arena: Benchmarking text-to-speech models in the wild [Electronic resource] / Hugging Face. --- 2024. --- URL: https://huggingface.co/spaces/TTS-AGI/TTS-Arena (дата обращения: 31.05.2026).
+\bibitem{valle} Wang C., Chen S., Wu Y. [et al.]. Neural codec language models are zero-shot text-to-speech synthesizers (VALL-E). --- 2023. --- arXiv:2301.02111.
+\bibitem{audioturing} Wang S., Zhao Y., Liu H. [et al.]. Audio Turing Test: Benchmarking the human-likeness of LLM-based TTS systems. --- 2025. --- arXiv:2505.11200.
+\bibitem{ecapamultispk} Xue J., Wang Y., Zhang J., Liu C., Tao J. ECAPA-TDNN for multi-speaker text-to-speech synthesis. --- 2022. --- arXiv:2203.10473.
+\bibitem{libritts} Zen H., Dang V., Clark R. [et al.]. LibriTTS: A corpus derived from LibriSpeech for text-to-speech // Proceedings of Interspeech 2019. --- Graz, Austria, 2019. --- P. 1526--1530.
 
 \end{thebibliography}
 
