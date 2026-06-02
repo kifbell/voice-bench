@@ -27,12 +27,14 @@ def _fmt(x, prec=3):
 
 
 def _pval(p):
+    # Returns math-mode content WITHOUT surrounding $...$, because every call
+    # site in report.tex wraps the value in inline math already (e.g. $p = \val...$).
     if p is None:
-        return "--"
+        return r"-\,-"
     if p < 1e-6:
-        return "$< 10^{-6}$"
+        return "< 10^{-6}"
     if p < 0.001:
-        return "$< 0.001$"
+        return "< 0.001"
     return f"{p:.3f}"
 
 

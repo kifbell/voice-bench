@@ -584,7 +584,12 @@ TTS Arena (open Hugging Face лидерборд) использует тольк
 В работе представлен бенчмарк \valNProviders{} коммерческих и open-source TTS- и voice-cloning-систем, сгенерировавших \valNRowsAnalysed{} аудиозаписей, проанализированных с использованием пяти автоматических метрик. Ключевые наблюдения:
 \begin{itemize}[noitemsep]
     \item В TTS-задаче не существует доминирующего провайдера; \valHOneTtsFrontierSize{} моделей находятся на Парето-фронте «качество--стоимость».
+    При минимальной стоимости и
+    максимальной скорости оптимален \valBestTtsLatencySecondsProvider{}
+    (\valBestTtsLatencySecondsValue{}~с/файл, \$16/1M~симв.); при ставке на естественность ---
+    \valBestTtsUtmosProvider{} (лучший UTMOSv2, \valBestTtsUtmosValue{}) или Azure~Neural Speech.
     \item В voice-cloning-задаче полный 5D Парето-фронт (UTMOSv2, NISQA, WavLM-sim, WER, cost) содержит \valHOneCloningFrontierSize{} из \valHOneCloningFrontierTotal{} моделей --- доминирующего провайдера нет, но CosyVoice2 (open-source) единственная присутствует на фронте во всех изучаемых проекциях, демонстрируя самое сильное сочетание естественности, схожести с диктором и нулевой стоимости.
+    CosyVoice2 достигает или превосходит коммерческие API по качеству  UTMOSv2~\valBestCloningUtmosValue{} и WavLM-схожесть~\valBestCloningWavlmSimValue{}.
     \item Метрики естественности UTMOSv2 и NISQA не достигают порога согласованности $\rho \geq 0.7$ ($\rho = \valHTwoTtsNatRho{}$ для TTS, $\rho = \valHTwoCloningNatRho{}$ для cloning), что подчёркивает важность отчётности по обеим.
     \item Метрики схожести с диктором WavLM и ECAPA практически идентично ранжируют модели ($\rho = \valHTwoCloningSimRho{}$); можно ограничиться одной.
     \item TOST-проверка эквивалентности коммерческих и open-source моделей (Таблица~\ref{tab:hypotheses}) даёт три качественно разных исхода. Эквивалентность подтверждена ($p < 0.05$) по разборчивости Whisper-WER в обеих задачах и по WavLM-similarity в задаче клонирования --- в этих осях коммерческие и open-source модели в среднем различаются менее чем на $\delta$ в любую сторону. Эквивалентность отвергается и разница превышает $\delta$ только в двух случаях: NISQA на TTS (коммерческие выше на $0.37$ против $\delta = 0.20$) и ECAPA-similarity на клонировании (open-source выше на $0.067$ против $\delta = 0.05$). По UTMOSv2 и NISQA-cloning тест неопределённый: разница меньше $\delta$, но мощности $5$--$6$ провайдеров не хватает для отвержения $H_{0,\text{TOST}}$.
