@@ -37,7 +37,7 @@ def _pval(p):
 
 
 def _bool(b):
-    return "\\textbf{подтверждена}" if b else "\\textbf{не подтверждена}"
+    return "\\textbf{подтверждена}" if b else "\\textbf{отвергается}"
 
 
 def _safe_cmd_name(s):

@@ -201,7 +201,7 @@ def gen_hypotheses(stats, out_path):
     content = f"""% Auto-generated. Do not edit.
 \\begin{{table}}[ht]
 \\centering
-\\caption{{Сводная таблица проверки гипотез. Колонка «Итог» --- $\\checkmark$ = подтверждена, $\\times$ = не подтверждена.}}
+\\caption{{Сводная таблица проверки гипотез. Колонка «Итог» --- $\\checkmark$ = подтверждена, $\\times$ = отвергается.}}
 \\label{{tab:hypotheses}}
 \\resizebox{{\\textwidth}}{{!}}{{%
 \\begin{{tabular}}{{llllc}}
